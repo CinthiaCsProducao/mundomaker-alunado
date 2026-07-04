@@ -22,12 +22,7 @@ function calcularCluster(total) {
   return "Bronze";
 }
 
-const CLUSTER = {
-  Diamond: { bg: "#00C7F4", text: "#000", emoji: "💎" },
-  Gold:    { bg: "#FFD902", text: "#000", emoji: "🥇" },
-  Silver:  { bg: "#e5e5e5", text: "#111", emoji: "🥈" },
-  Bronze:  { bg: "#FFA300", text: "#000", emoji: "🥉" },
-};
+
 
 const font = "'Circular Std', 'Nunito', 'Helvetica Neue', Arial, sans-serif";
 
