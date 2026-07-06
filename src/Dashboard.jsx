@@ -35,6 +35,17 @@ function calcularCluster(total) {
   return "Bronze";
 }
 
+const SEGMENTOS = ["Infantil", "Fundamental 1", "Fundamental 2", "Ensino Medio", "Outros"];
+
+function categorizarSegmento(serie) {
+  const s = (serie || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (/berc|maternal|jardim|pre.escola|pre\s*escola|infantil|creche/.test(s) || /^pre$/.test(s.trim())) return "Infantil";
+  if (/^[1-5][ao]?\s*ano/.test(s) || /primeiro|segundo|terceiro|quarto|quinto/.test(s)) return "Fundamental 1";
+  if (/^[6-9][ao]?\s*ano/.test(s) || /sexto|setimo|oitavo|nono/.test(s)) return "Fundamental 2";
+  if (/medio|media|ensino.medio|^[123][ao]\s*serie/.test(s)) return "Ensino Medio";
+  return "Outros";
+}
+
 function LogoMM({ size = 56, cor = "#111" }) {
   const textFill = cor === "#111" || cor === "#000" ? "#fff" : "#111";
   return (
@@ -345,9 +356,131 @@ function ModalEncerrarCiclo({ cicloAtivo, totalAlunos, totalEscolas, escolas, on
   );
 }
 
+function ModalEscolaHistorico({ escola, onClose }) {
+  const [envios, setEnvios] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [envioSelecionado, setEnvioSelecionado] = useState(null);
+
+  useEffect(() => {
+    if (!escola) return;
+    async function buscar() {
+      setLoading(true);
+      const { data: histories } = await supabase
+        .from("alunado_history")
+        .select("*")
+        .eq("school_id", escola.id)
+        .order("data_submissao", { ascending: false });
+
+      const items = [];
+      for (const h of (histories || [])) {
+        const [{ data: gc }, { data: cl }] = await Promise.all([
+          supabase.from("grade_classes").select("id, serie, ordem").eq("school_id", escola.id).order("ordem"),
+          supabase.from("classes").select("grade_class_id, turma, num_alunos, professor_maker").eq("school_id", escola.id),
+        ]);
+        items.push({ ...h, series: gc || [], turmas: cl || [] });
+      }
+      setEnvios(items);
+      setLoading(false);
+    }
+    buscar();
+  }, [escola]); // eslint-disable-line
+
+  if (!escola) return null;
+  const clus = escola.cluster || "Bronze";
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3000, padding: 20, fontFamily: font }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ background: "#fff", borderRadius: 10, width: "100%", maxWidth: 680, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.3)" }}>
+        <div style={{ background: "#111", padding: "18px 24px", borderRadius: "10px 10px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 1 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>{escola.nome}</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <span style={{ background: CLUSTER_INFO[clus]?.bg, color: CLUSTER_INFO[clus]?.text, padding: "2px 10px", borderRadius: 50, fontSize: 11, fontWeight: 700 }}>{CLUSTER_PT[clus]}</span>
+              <span style={{ color: "#39DF18", fontWeight: 700, fontSize: 13 }}>{(escola.total_alunos || 0).toLocaleString("pt-BR")} alunos</span>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer" }}>x</button>
+        </div>
+
+        <div style={{ padding: "16px 24px" }}>
+          {loading ? (
+            <div style={{ textAlign: "center", padding: 40, color: "#aaa" }}>Carregando formularios...</div>
+          ) : envios.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 40, color: "#aaa" }}>Nenhum formulario encontrado.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 14 }}>
+              {envios.map((env, idx) => {
+                const expanded = envioSelecionado === idx;
+                const totalEnv = env.total_alunos || env.turmas.reduce((a, t) => a + (t.num_alunos || 0), 0);
+                const seriesComTurmas = env.series.map(s => ({ ...s, turmas: env.turmas.filter(t => t.grade_class_id === s.id) }));
+                return (
+                  <div key={env.id} style={{ border: "1.5px solid #e5e5e5", borderRadius: 8, overflow: "hidden" }}>
+                    <div style={{ background: "#f9f9f9", padding: "12px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111" }}>
+                          Envio #{envios.length - idx} — {new Date(env.data_submissao).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
+                          {env.responsavel_preenchimento && `Resp: ${env.responsavel_preenchimento} · `}{totalEnv.toLocaleString("pt-BR")} alunos
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={() => gerarPDF(escola, { series: env.series, turmas: env.turmas }, env)}
+                          style={{ background: "#39DF18", color: "#000", border: "none", borderRadius: 4, padding: "6px 12px", fontSize: 11, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+                          PDF
+                        </button>
+                        {env.calendario_url && (
+                          <a href={env.calendario_url} target="_blank" rel="noreferrer"
+                            style={{ background: "#00C7F4", color: "#000", border: "none", borderRadius: 4, padding: "6px 12px", fontSize: 11, fontWeight: 700, fontFamily: font, cursor: "pointer", textDecoration: "none" }}>
+                            Calendario
+                          </a>
+                        )}
+                        <button onClick={() => setEnvioSelecionado(expanded ? null : idx)}
+                          style={{ background: "#111", color: "#fff", border: "none", borderRadius: 4, padding: "6px 12px", fontSize: 11, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+                          {expanded ? "Fechar" : "Ver Series"}
+                        </button>
+                      </div>
+                    </div>
+                    {expanded && (
+                      <div style={{ padding: "14px 18px", borderTop: "1px solid #eee" }}>
+                        {seriesComTurmas.map(serie => (
+                          <div key={serie.id} style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#111", background: "#f5f5f5", padding: "5px 10px", borderRadius: 4, marginBottom: 6 }}>{serie.serie}</div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingLeft: 8 }}>
+                              {serie.turmas.map((t, i) => (
+                                <div key={i} style={{ background: "#fff", border: "1.5px solid #e8e8e8", borderRadius: 6, padding: "7px 12px", fontSize: 12, minWidth: 100 }}>
+                                  <div style={{ fontWeight: 700, color: "#111" }}>Turma {t.turma}</div>
+                                  <div style={{ color: "#39DF18", fontWeight: 800, fontSize: 15 }}>{t.num_alunos}</div>
+                                  {t.professor_maker && <div style={{ color: "#888", fontSize: 10, marginTop: 2 }}>{t.professor_maker}</div>}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        {env.assinatura_url && (
+                          <div style={{ marginTop: 10 }}>
+                            <div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase", marginBottom: 4 }}>Assinatura</div>
+                            <img src={env.assinatura_url} alt="assinatura" style={{ maxHeight: 60, border: "1px solid #ddd", borderRadius: 4 }} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ModalCicloDetalhe({ ciclo, onClose }) {
   const snapshot = ciclo.snapshot || [];
   const fmtDate = (val) => val ? new Date(val).toLocaleDateString("pt-BR") : "—";
+  const [escolaHist, setEscolaHist] = useState(null);
   const porCluster = ["Diamond", "Gold", "Silver", "Bronze"].map(c => ({
     cluster: c,
     count:  snapshot.filter(e => e.cluster === c).length,
@@ -395,7 +528,7 @@ function ModalCicloDetalhe({ ciclo, onClose }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: "#f5f5f5" }}>
-                    {["Escola", "Programa", "Cluster", "Frete", "Alunos"].map(h => (
+                    {["Escola", "Programa", "Cluster", "Frete", "Alunos", ""].map(h => (
                       <th key={h} style={{ padding: "9px 14px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase" }}>{h}</th>
                     ))}
                   </tr>
@@ -416,11 +549,18 @@ function ModalCicloDetalhe({ ciclo, onClose }) {
                         </span>
                       </td>
                       <td style={{ padding: "10px 14px", fontWeight: 800, textAlign: "right" }}>{(e.total_alunos || 0).toLocaleString("pt-BR")}</td>
+                      <td style={{ padding: "10px 14px" }}>
+                        <button onClick={() => setEscolaHist(e)}
+                          style={{ background: "#111", color: "#fff", border: "none", borderRadius: 4, padding: "5px 10px", fontSize: 11, fontWeight: 700, fontFamily: font, cursor: "pointer", whiteSpace: "nowrap" }}>
+                          Ver PDFs
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   <tr style={{ borderTop: "2px solid #111", background: "#f5f5f5" }}>
                     <td colSpan={4} style={{ padding: "10px 14px", fontWeight: 700, fontSize: 12 }}>TOTAL DO CICLO</td>
                     <td style={{ padding: "10px 14px", fontWeight: 800, textAlign: "right" }}>{(ciclo.total_alunos || 0).toLocaleString("pt-BR")}</td>
+                    <td />
                   </tr>
                 </tbody>
               </table>
@@ -434,6 +574,7 @@ function ModalCicloDetalhe({ ciclo, onClose }) {
           </button>
         </div>
       </div>
+      {escolaHist && <ModalEscolaHistorico escola={escolaHist} onClose={() => setEscolaHist(null)} />}
     </div>
   );
 }
@@ -525,6 +666,171 @@ function HistoricoCiclos({ ciclos, onVoltar }) {
       {cicloSelecionado && (
         <ModalCicloDetalhe ciclo={cicloSelecionado} onClose={() => setCicloSelecionado(null)} />
       )}
+    </div>
+  );
+}
+
+function EscolasDashboard({ onVoltar }) {
+  const [escolas, setEscolas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busca, setBusca] = useState("");
+  const [escolaSel, setEscolaSel] = useState(null);
+
+  useEffect(() => {
+    async function carregar() {
+      setLoading(true);
+      const [{ data: schools }, { data: histories }, { data: allGC }, { data: allCL }] = await Promise.all([
+        supabase.from("schools").select("*").order("nome"),
+        supabase.from("alunado_history").select("school_id, total_alunos, cluster, data_submissao").order("data_submissao", { ascending: false }),
+        supabase.from("grade_classes").select("id, school_id, serie"),
+        supabase.from("classes").select("school_id, grade_class_id, num_alunos"),
+      ]);
+
+      const nomesVistos = new Set();
+      const resultado = [];
+
+      (schools || []).sort((a, b) => (a.nome || "").localeCompare(b.nome || "")).forEach(escola => {
+        const nomeNorm = (escola.nome || "").trim().toLowerCase();
+        if (nomesVistos.has(nomeNorm)) return;
+        nomesVistos.add(nomeNorm);
+
+        const idsNome = (schools || []).filter(s => (s.nome || "").trim().toLowerCase() === nomeNorm).map(s => s.id);
+        const histRecente = (histories || []).find(h => idsNome.includes(h.school_id));
+        const idAtual = histRecente ? histRecente.school_id : escola.id;
+        const dadosEscola = (schools || []).find(s => s.id === idAtual) || escola;
+
+        const turmas = (allCL || []).filter(c => c.school_id === idAtual);
+        const series = (allGC || []).filter(g => g.school_id === idAtual);
+
+        const segMap = {};
+        SEGMENTOS.forEach(s => { segMap[s] = 0; });
+        series.forEach(gc => {
+          const seg = categorizarSegmento(gc.serie);
+          const turmasGC = turmas.filter(t => t.grade_class_id === gc.id);
+          segMap[seg] = (segMap[seg] || 0) + turmasGC.reduce((a, t) => a + (t.num_alunos || 0), 0);
+        });
+
+        const totalCalc = turmas.reduce((a, c) => a + (c.num_alunos || 0), 0);
+        resultado.push({
+          ...dadosEscola,
+          total_alunos:   histRecente ? histRecente.total_alunos : totalCalc,
+          cluster:        histRecente ? histRecente.cluster : calcularCluster(totalCalc),
+          data_submissao: histRecente ? histRecente.data_submissao : dadosEscola.created_at,
+          segmentos:      segMap,
+        });
+      });
+
+      setEscolas(resultado);
+      setLoading(false);
+    }
+    carregar();
+  }, []);
+
+  const filtradas = escolas.filter(e => (e.nome || "").toLowerCase().includes(busca.toLowerCase()));
+  const totalGeral = escolas.reduce((a, e) => a + (e.total_alunos || 0), 0);
+  const segTotais = {};
+  SEGMENTOS.forEach(s => { segTotais[s] = escolas.reduce((a, e) => a + (e.segmentos?.[s] || 0), 0); });
+
+  const SEG_COLORS = {
+    "Infantil":       "#00C7F4",
+    "Fundamental 1":  "#39DF18",
+    "Fundamental 2":  "#FFD902",
+    "Ensino Medio":   "#FFA300",
+    "Outros":         "#ccc",
+  };
+
+  return (
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 20px", fontFamily: font }}>
+      <div style={{ marginBottom: 28 }}>
+        <button onClick={onVoltar} style={{ background: "none", border: "none", color: "#666", fontSize: 13, cursor: "pointer", fontFamily: font, padding: 0, marginBottom: 8, display: "block" }}>
+          Voltar ao Dashboard
+        </button>
+        <div style={{ fontSize: 26, fontWeight: 800, color: "#111" }}>Escolas</div>
+        <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>{escolas.length} escola{escolas.length !== 1 ? "s" : ""} cadastrada{escolas.length !== 1 ? "s" : ""} (todos os ciclos)</div>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 60, color: "#aaa", fontSize: 15 }}>Carregando...</div>
+      ) : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+            <div style={{ background: "#111", borderRadius: 8, padding: "22px 28px" }}>
+              <div style={{ fontSize: 44, fontWeight: 800, color: "#39DF18", lineHeight: 1 }}>{totalGeral.toLocaleString("pt-BR")}</div>
+              <div style={{ fontSize: 11, color: "#aaa", textTransform: "uppercase", marginTop: 6 }}>Total de Alunos (todos os ciclos)</div>
+            </div>
+            <div style={{ background: "#fff", borderRadius: 8, padding: "22px 28px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
+              <div style={{ fontSize: 44, fontWeight: 800, color: "#111", lineHeight: 1 }}>{escolas.length}</div>
+              <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", marginTop: 6 }}>Escolas Unicas</div>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 28 }}>
+            {SEGMENTOS.filter(s => s !== "Outros" || segTotais["Outros"] > 0).map(seg => (
+              <div key={seg} style={{ background: "#fff", borderRadius: 8, padding: "16px 20px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", borderTop: `4px solid ${SEG_COLORS[seg]}` }}>
+                <div style={{ fontSize: 28, fontWeight: 800, color: "#111", lineHeight: 1 }}>{(segTotais[seg] || 0).toLocaleString("pt-BR")}</div>
+                <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", marginTop: 4, letterSpacing: 0.5 }}>{seg}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ background: "#fff", borderRadius: 8, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", overflow: "hidden" }}>
+            <div style={{ background: "#111", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: 1.5 }}>Lista de Escolas</div>
+              <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar escola..."
+                style={{ padding: "7px 12px", borderRadius: 4, border: "none", fontSize: 13, fontFamily: font, width: 220 }} />
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "#f5f5f5" }}>
+                    {["Escola", "Cluster", "Total", "Infantil", "Fund. 1", "Fund. 2", "Ens. Medio", "Programa", ""].map(h => (
+                      <th key={h} style={{ padding: "9px 14px", textAlign: h === "Total" || h === "Infantil" || h === "Fund. 1" || h === "Fund. 2" || h === "Ens. Medio" ? "right" : "left", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtradas.length === 0 ? (
+                    <tr><td colSpan={9} style={{ padding: 32, textAlign: "center", color: "#aaa" }}>Nenhuma escola encontrada.</td></tr>
+                  ) : filtradas.map((e, i) => (
+                    <tr key={e.id} style={{ borderTop: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                      <td style={{ padding: "10px 14px", fontWeight: 600, color: "#111", maxWidth: 200 }}>{e.nome}</td>
+                      <td style={{ padding: "10px 14px" }}>
+                        <span style={{ background: CLUSTER_INFO[e.cluster]?.bg || "#eee", color: CLUSTER_INFO[e.cluster]?.text || "#000", padding: "2px 8px", borderRadius: 50, fontSize: 11, fontWeight: 700 }}>
+                          {CLUSTER_PT[e.cluster] || e.cluster}
+                        </span>
+                      </td>
+                      <td style={{ padding: "10px 14px", fontWeight: 800, textAlign: "right" }}>{(e.total_alunos || 0).toLocaleString("pt-BR")}</td>
+                      {["Infantil", "Fundamental 1", "Fundamental 2", "Ensino Medio"].map(seg => (
+                        <td key={seg} style={{ padding: "10px 14px", textAlign: "right", color: e.segmentos?.[seg] > 0 ? "#111" : "#ccc" }}>
+                          {e.segmentos?.[seg] > 0 ? (e.segmentos[seg]).toLocaleString("pt-BR") : "—"}
+                        </td>
+                      ))}
+                      <td style={{ padding: "10px 14px", color: "#666", fontSize: 12 }}>{e.programa || "—"}</td>
+                      <td style={{ padding: "10px 14px" }}>
+                        <button onClick={() => setEscolaSel(e)}
+                          style={{ background: "#111", color: "#fff", border: "none", borderRadius: 4, padding: "5px 10px", fontSize: 11, fontWeight: 700, fontFamily: font, cursor: "pointer", whiteSpace: "nowrap" }}>
+                          Formularios
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr style={{ borderTop: "2px solid #111", background: "#f5f5f5" }}>
+                    <td style={{ padding: "10px 14px", fontWeight: 700, fontSize: 12 }}>TOTAL</td>
+                    <td />
+                    <td style={{ padding: "10px 14px", fontWeight: 800, textAlign: "right" }}>{totalGeral.toLocaleString("pt-BR")}</td>
+                    {["Infantil", "Fundamental 1", "Fundamental 2", "Ensino Medio"].map(seg => (
+                      <td key={seg} style={{ padding: "10px 14px", fontWeight: 800, textAlign: "right" }}>{(segTotais[seg] || 0).toLocaleString("pt-BR")}</td>
+                    ))}
+                    <td colSpan={2} />
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {escolaSel && <ModalEscolaHistorico escola={escolaSel} onClose={() => setEscolaSel(null)} />}
     </div>
   );
 }
@@ -1160,6 +1466,10 @@ export default function Dashboard() {
             style={{ background: view === "historico" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
             Historico de Ciclos {ciclosHist.length > 0 && `(${ciclosHist.length})`}
           </button>
+          <button onClick={() => setView(view === "escolas" ? "dashboard" : "escolas")}
+            style={{ background: view === "escolas" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+            Escolas
+          </button>
           <button onClick={() => setView(view === "projecao" ? "dashboard" : "projecao")}
             style={{ background: view === "projecao" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
             Projecao de Material
@@ -1184,6 +1494,10 @@ export default function Dashboard() {
 
       {view === "historico" && (
         <HistoricoCiclos ciclos={ciclosHist} onVoltar={() => setView("dashboard")} />
+      )}
+
+      {view === "escolas" && (
+        <EscolasDashboard onVoltar={() => setView("dashboard")} />
       )}
 
       {view === "projecao" && (
