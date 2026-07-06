@@ -102,12 +102,10 @@ function gerarPDF(escola, detalhes, hist) {
     </style>
     </head><body>
     <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Salvar como PDF</button>
-
     <div class="header">
       <h1>Mundo Maker — Formulário de Alunado</h1>
       <p>Enviado em: ${new Date(escola.data_submissao).toLocaleDateString("pt-BR")}</p>
     </div>
-
     <div class="section">
       <div class="sec-title">1. Dados da Escola</div>
       <div class="sec-body">
@@ -123,7 +121,6 @@ function gerarPDF(escola, detalhes, hist) {
         </div>
       </div>
     </div>
-
     <div class="section">
       <div class="sec-title">2. Programa e Idioma</div>
       <div class="sec-body">
@@ -133,7 +130,6 @@ function gerarPDF(escola, detalhes, hist) {
         </div>
       </div>
     </div>
-
     <div class="section">
       <div class="sec-title">3. Séries e Turmas</div>
       <div class="sec-body">
@@ -147,7 +143,6 @@ function gerarPDF(escola, detalhes, hist) {
         </div>
       </div>
     </div>
-
     ${hist ? `
     <div class="section">
       <div class="sec-title">4. Responsável pelo Preenchimento</div>
@@ -157,7 +152,6 @@ function gerarPDF(escola, detalhes, hist) {
       </div>
     </div>
     ` : ""}
-
     ${hist && hist.calendario_url ? `
     <div class="section">
       <div class="sec-title">5. Calendário Escolar</div>
@@ -214,7 +208,6 @@ function ModalDetalhes({ escola, onClose, onDelete, isAdmin }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20, fontFamily: font }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{ background: "#fff", borderRadius: 10, width: "100%", maxWidth: 700, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.25)" }}>
-
         <div style={{ background: "#111", padding: "20px 28px", borderRadius: "10px 10px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{escola.nome}</div>
@@ -229,7 +222,6 @@ function ModalDetalhes({ escola, onClose, onDelete, isAdmin }) {
           </div>
           <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#aaa", fontSize: 24, cursor: "pointer" }}>✕</button>
         </div>
-
         <div style={{ padding: "20px 28px", borderBottom: "1px solid #f0f0f0" }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: 1, marginBottom: 14 }}>Dados da Escola</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px", fontSize: 13 }}>
@@ -244,21 +236,18 @@ function ModalDetalhes({ escola, onClose, onDelete, isAdmin }) {
             <div><div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Recebimento do Material</div><div style={{ fontWeight: 600, color: "#222", marginTop: 2 }}>{escola.data_recebimento ? new Date(escola.data_recebimento + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</div></div>
           </div>
         </div>
-
         {(escola.programa || escola.idioma_material) && (
           <div style={{ padding: "16px 28px", borderBottom: "1px solid #f0f0f0", display: "flex", gap: 32 }}>
             {escola.programa && <div><div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Programa</div><div style={{ fontWeight: 700, color: "#111", marginTop: 2, fontSize: 13 }}>{escola.programa}</div></div>}
             {escola.idioma_material && <div><div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Idioma do Material</div><div style={{ fontWeight: 700, color: "#111", marginTop: 2, fontSize: 13 }}>{escola.idioma_material}</div></div>}
           </div>
         )}
-
         {hist && hist.responsavel_preenchimento && (
           <div style={{ padding: "12px 28px", borderBottom: "1px solid #f0f0f0" }}>
             <div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Responsável pelo Preenchimento</div>
             <div style={{ fontWeight: 600, color: "#222", marginTop: 2, fontSize: 13 }}>{hist.responsavel_preenchimento}</div>
           </div>
         )}
-
         <div style={{ padding: "20px 28px", borderBottom: "1px solid #f0f0f0" }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: 1, marginBottom: 16 }}>
             Séries e Turmas ({escola.num_series} série{escola.num_series !== 1 ? "s" : ""}, {escola.num_turmas} turma{escola.num_turmas !== 1 ? "s" : ""})
@@ -285,7 +274,6 @@ function ModalDetalhes({ escola, onClose, onDelete, isAdmin }) {
             ))
           )}
         </div>
-
         {hist && hist.calendario_url && (
           <div style={{ padding: "14px 28px", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
@@ -294,20 +282,19 @@ function ModalDetalhes({ escola, onClose, onDelete, isAdmin }) {
             </div>
             <a href={hist.calendario_url} target="_blank" rel="noreferrer"
               style={{ background: "#111", color: "#fff", padding: "8px 16px", borderRadius: 4, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>
-              ⬇ Baixar
+              Baixar
             </a>
           </div>
         )}
-
         <div style={{ padding: "16px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
           <button onClick={() => gerarPDF(escola, detalhes, hist)}
             style={{ background: "#39DF18", color: "#000", border: "none", borderRadius: 4, padding: "9px 20px", fontSize: 13, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-            🖨️ Gerar PDF
+            Gerar PDF
           </button>
           {isAdmin && (!confirmDelete ? (
             <button onClick={() => setConfirmDelete(true)}
               style={{ background: "#fff", color: "#e53935", border: "1.5px solid #e53935", borderRadius: 4, padding: "9px 20px", fontSize: 13, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-              🗑 Excluir Escola
+              Excluir Escola
             </button>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -386,24 +373,22 @@ function ProjecaoMaterial({ escolas, onVoltar }) {
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 20px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <button onClick={onVoltar}
-            style={{ background: "none", border: "none", color: "#666", fontSize: 13, cursor: "pointer", fontFamily: font, padding: 0, marginBottom: 6 }}>
-            ← Voltar ao Dashboard
+          <button onClick={onVoltar} style={{ background: "none", border: "none", color: "#666", fontSize: 13, cursor: "pointer", fontFamily: font, padding: 0, marginBottom: 6 }}>
+            Voltar ao Dashboard
           </button>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#111" }}>📦 Projeção de Saída de Material</div>
-          <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>Planejamento de entregas, produção e emissão de NF</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#111" }}>Projecao de Saida de Material</div>
+          <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>Planejamento de entregas, producao e emissao de NF</div>
         </div>
         <div style={{ background: "#111", borderRadius: 8, padding: "16px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 32, fontWeight: 800, color: "#39DF18", lineHeight: 1 }}>{totalProjetado.toLocaleString("pt-BR")}</div>
           <div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase", marginTop: 4 }}>Alunos Projetados</div>
         </div>
       </div>
-
       <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-        <button style={btnStyle(subView === "datas")} onClick={() => setSubView("datas")}>📅 Por Data de Entrega</button>
-        <button style={btnStyle(subView === "mensal")} onClick={() => setSubView("mensal")}>📆 Visão Mensal</button>
-        <button style={btnStyle(subView === "frete")} onClick={() => setSubView("frete")}>🚚 Por Tipo de Frete</button>
-        <button style={btnStyle(subView === "programa")} onClick={() => setSubView("programa")}>📚 Por Programa</button>
+        <button style={btnStyle(subView === "datas")} onClick={() => setSubView("datas")}>Por Data de Entrega</button>
+        <button style={btnStyle(subView === "mensal")} onClick={() => setSubView("mensal")}>Visao Mensal</button>
+        <button style={btnStyle(subView === "frete")} onClick={() => setSubView("frete")}>Por Tipo de Frete</button>
+        <button style={btnStyle(subView === "programa")} onClick={() => setSubView("programa")}>Por Programa</button>
       </div>
 
       {subView === "datas" && (
@@ -463,7 +448,7 @@ function ProjecaoMaterial({ escolas, onVoltar }) {
           {semData.length > 0 && (
             <div style={{ background: "#fff8e1", borderRadius: 8, padding: "16px 24px", border: "1.5px dashed #FFD902", marginTop: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#9a7c00", marginBottom: 12 }}>
-                ⚠️ {semData.length} escola{semData.length !== 1 ? "s" : ""} sem data de recebimento definida
+                {semData.length} escola{semData.length !== 1 ? "s" : ""} sem data de recebimento definida
               </div>
               {semData.map(e => (
                 <div key={e.id} style={{ fontSize: 13, color: "#555", padding: "4px 0", borderBottom: "1px solid #f0e68c", display: "flex", justifyContent: "space-between" }}>
@@ -650,12 +635,22 @@ export default function Dashboard() {
       const { data: classes }       = await supabase.from("classes").select("school_id, num_alunos");
       const { data: grade_classes } = await supabase.from("grade_classes").select("id, school_id, serie");
 
+      // De-duplicar por NOME: para cada escola única, usa o envio mais recente
+      const nomesVistos = new Set();
       const schoolsUnico = [];
-      const vistosIds = new Set();
+
       (schools || []).forEach(escola => {
-        if (!vistosIds.has(escola.id)) {
-          vistosIds.add(escola.id);
-          schoolsUnico.push(escola);
+        const nomeNorm = (escola.nome || "").trim().toLowerCase();
+        if (!nomesVistos.has(nomeNorm)) {
+          nomesVistos.add(nomeNorm);
+          const idsNome = (schools || [])
+            .filter(s => (s.nome || "").trim().toLowerCase() === nomeNorm)
+            .map(s => s.id);
+          const histRecente = (history || []).find(h => idsNome.includes(h.school_id));
+          const escolaRecente = histRecente
+            ? (schools || []).find(s => s.id === histRecente.school_id)
+            : escola;
+          schoolsUnico.push(escolaRecente || escola);
         }
       });
 
@@ -758,10 +753,9 @@ export default function Dashboard() {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <button
-            onClick={() => setView(view === "projecao" ? "dashboard" : "projecao")}
+          <button onClick={() => setView(view === "projecao" ? "dashboard" : "projecao")}
             style={{ background: view === "projecao" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-            📦 Projeção de Material
+            Projecao de Material
           </button>
           {equipeLogada && (
             <span style={{ background: equipeLogada.cor, color: "#000", padding: "5px 12px", borderRadius: 50, fontSize: 11, fontWeight: 700 }}>
@@ -795,7 +789,6 @@ export default function Dashboard() {
                   <div style={{ fontSize: 12, color: "#888", textTransform: "uppercase", letterSpacing: 1, marginTop: 4 }}>Escolas Cadastradas</div>
                 </div>
               </div>
-
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 32 }}>
                 {porCluster.map(({ cluster, count, alunos }) => (
                   <div key={cluster} style={{ background: CLUSTER_INFO[cluster].bg, color: CLUSTER_INFO[cluster].text, borderRadius: 8, padding: "20px" }}>
@@ -806,9 +799,8 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
-
               <div style={{ background: "#fff", borderRadius: 8, padding: "24px 28px", marginBottom: 24, boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#111", textTransform: "uppercase", letterSpacing: 1, marginBottom: 20 }}>Distribuição por Cluster</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#111", textTransform: "uppercase", letterSpacing: 1, marginBottom: 20 }}>Distribuicao por Cluster</div>
                 {porCluster.map(({ cluster, count }) => {
                   const pct = totalEscolas > 0 ? (count / totalEscolas) * 100 : 0;
                   return (
@@ -824,7 +816,6 @@ export default function Dashboard() {
                   );
                 })}
               </div>
-
               <div style={{ background: "#fff", borderRadius: 8, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", overflow: "hidden" }}>
                 <div style={{ background: "#111", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: 1.5 }}>Escolas Cadastradas</div>
@@ -843,7 +834,7 @@ export default function Dashboard() {
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
                       <tr style={{ background: "#f5f5f5" }}>
-                        {["Escola", "Programa", "Idioma", "Cluster", "Alunos", "Frete", "Data", "Ações"].map(h => (
+                        {["Escola", "Programa", "Idioma", "Cluster", "Alunos", "Frete", "Data", "Acoes"].map(h => (
                           <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</th>
                         ))}
                       </tr>
