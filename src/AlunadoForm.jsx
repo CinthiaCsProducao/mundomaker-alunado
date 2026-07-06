@@ -85,7 +85,13 @@ function gerarPDFFormulario(dadosGerais, series, totalAlunos, responsavel, calen
           <div><div class="f-label">Nome</div><div class="f-val">${dadosGerais.nome}</div></div>
           <div><div class="f-label">Responsável pelo Recebimento</div><div class="f-val">${dadosGerais.responsavel || "—"}</div></div>
           <div><div class="f-label">Telefone</div><div class="f-val">${dadosGerais.telefone || "—"}</div></div>
-          <div><div class="f-label">Endereço</div><div class="f-val">${dadosGerais.endereco || "—"}</div></div>
+          <div><div class="f-label">CEP</div><div class="f-val">${dadosGerais.cep || "—"}</div></div>
+          <div><div class="f-label">Logradouro</div><div class="f-val">${dadosGerais.logradouro || "—"}</div></div>
+          <div><div class="f-label">Número</div><div class="f-val">${dadosGerais.numero || "—"}</div></div>
+          <div><div class="f-label">Complemento</div><div class="f-val">${dadosGerais.complemento || "—"}</div></div>
+          <div><div class="f-label">Bairro</div><div class="f-val">${dadosGerais.bairro || "—"}</div></div>
+          <div><div class="f-label">Cidade</div><div class="f-val">${dadosGerais.cidade || "—"}</div></div>
+          <div><div class="f-label">Estado</div><div class="f-val">${dadosGerais.estado || "—"}</div></div>
           <div><div class="f-label">Tipo de Frete</div><div class="f-val">${dadosGerais.tipo_frete || "—"}</div></div>
           <div><div class="f-label">Início das Aulas</div><div class="f-val">${fmtDate(dadosGerais.data_inicio)}</div></div>
           <div><div class="f-label">Recebimento do Material</div><div class="f-val">${fmtDate(dadosGerais.data_recebimento)}</div></div>
@@ -183,7 +189,9 @@ const S = {
 export default function AlunadoForm() {
 
   const [dadosGerais, setDadosGerais] = useState({
-    nome: "", endereco: "", telefone: "",
+    nome: "",
+    cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
+    telefone: "",
     responsavel: "", data_inicio: "", data_recebimento: "", tipo_frete: "CIF",
     programa: "", idioma_material: "Português",
   });
@@ -283,10 +291,20 @@ export default function AlunadoForm() {
     const err = validar(); if (err) { setErro(err); return; }
     setLoading(true);
     try {
+      const enderecoCompleto = [
+        dadosGerais.logradouro,
+        dadosGerais.numero,
+        dadosGerais.complemento,
+        dadosGerais.bairro,
+        dadosGerais.cidade,
+        dadosGerais.estado,
+        dadosGerais.cep,
+      ].filter(Boolean).join(", ");
+
       const { data: escola, error: e1 } = await supabase.from("schools")
         .insert([{
           nome: dadosGerais.nome,
-          endereco: dadosGerais.endereco,
+          endereco: enderecoCompleto,
           telefone: dadosGerais.telefone,
           responsavel_escola: dadosGerais.responsavel,
           data_inicio: dadosGerais.data_inicio || null,
@@ -416,11 +434,58 @@ export default function AlunadoForm() {
                     onChange={e => setDadosGerais({...dadosGerais, nome:e.target.value})}
                     placeholder="Ex: Colégio São Paulo" />
                 </div>
-                <div style={S.field}>
-                  <label style={S.label}>Endereço</label>
-                  <input style={S.input} value={dadosGerais.endereco}
-                    onChange={e => setDadosGerais({...dadosGerais, endereco:e.target.value})}
-                    placeholder="Rua, número, bairro, cidade" />
+                {/* Endereço */}
+                <div style={S.grid2}>
+                  <div style={S.field}>
+                    <label style={S.label}>CEP</label>
+                    <input style={S.input} value={dadosGerais.cep}
+                      onChange={e => setDadosGerais({...dadosGerais, cep:e.target.value})}
+                      placeholder="00000-000" />
+                  </div>
+                  <div style={S.field}>
+                    <label style={S.label}>Logradouro (Rua / Av.)</label>
+                    <input style={S.input} value={dadosGerais.logradouro}
+                      onChange={e => setDadosGerais({...dadosGerais, logradouro:e.target.value})}
+                      placeholder="Ex: Rua das Flores" />
+                  </div>
+                </div>
+                <div style={S.grid3}>
+                  <div style={S.field}>
+                    <label style={S.label}>Número</label>
+                    <input style={S.input} value={dadosGerais.numero}
+                      onChange={e => setDadosGerais({...dadosGerais, numero:e.target.value})}
+                      placeholder="Ex: 123" />
+                  </div>
+                  <div style={S.field}>
+                    <label style={S.label}>Complemento</label>
+                    <input style={S.input} value={dadosGerais.complemento}
+                      onChange={e => setDadosGerais({...dadosGerais, complemento:e.target.value})}
+                      placeholder="Bloco, apto (opcional)" />
+                  </div>
+                  <div style={S.field}>
+                    <label style={S.label}>Bairro</label>
+                    <input style={S.input} value={dadosGerais.bairro}
+                      onChange={e => setDadosGerais({...dadosGerais, bairro:e.target.value})}
+                      placeholder="Ex: Centro" />
+                  </div>
+                </div>
+                <div style={S.grid2}>
+                  <div style={S.field}>
+                    <label style={S.label}>Cidade</label>
+                    <input style={S.input} value={dadosGerais.cidade}
+                      onChange={e => setDadosGerais({...dadosGerais, cidade:e.target.value})}
+                      placeholder="Ex: São Paulo" />
+                  </div>
+                  <div style={S.field}>
+                    <label style={S.label}>Estado</label>
+                    <select style={S.select} value={dadosGerais.estado}
+                      onChange={e => setDadosGerais({...dadosGerais, estado:e.target.value})}>
+                      <option value="">Selecione...</option>
+                      {["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"].map(uf => (
+                        <option key={uf} value={uf}>{uf}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div style={S.grid2}>
                   <div style={S.field}>
@@ -616,68 +681,3 @@ export default function AlunadoForm() {
                 ) : (
                   <>
                     <div style={{ fontSize: 32, marginBottom: 8 }}>📁</div>
-                    <div style={{ fontWeight: 700, color: "#111", fontSize: 14 }}>
-                      Clique para anexar o calendário
-                    </div>
-                    <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
-                      PDF, JPG ou PNG — máx. 10MB
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ── SEÇÃO 5: Responsável ── */}
-          <div style={S.sectionBlock}>
-            <div style={S.sectionHead}>
-              <div style={S.sectionNum}>5</div>
-              <div style={S.sectionTitle}>Responsável pelo Preenchimento</div>
-            </div>
-            <div style={S.sectionBody}>
-              <div style={S.field}>
-                <label style={S.label}>Nome completo *</label>
-                <input style={S.input} value={responsavel}
-                  onChange={e => setResponsavel(e.target.value)}
-                  placeholder="Quem está preenchendo este formulário?" />
-              </div>
-            </div>
-          </div>
-
-          {/* ── SEÇÃO 6: Assinatura ── */}
-          <div style={S.sectionBlock}>
-            <div style={S.sectionHead}>
-              <div style={S.sectionNum}>6</div>
-              <div style={S.sectionTitle}>Assinatura Digital</div>
-            </div>
-            <div style={S.sectionBody}>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
-                Assine abaixo com o mouse ou dedo (touch):
-              </div>
-              <canvas ref={canvasRef} width={760} height={160} style={S.canvas}
-                onMouseDown={iniciarDesenho} onMouseMove={desenhar}
-                onMouseUp={pararDesenho} onMouseLeave={pararDesenho}
-                onTouchStart={iniciarDesenho} onTouchMove={desenhar} onTouchEnd={pararDesenho}
-              />
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
-                <button type="button" style={{ ...S.btn, ...S.btnDanger }}
-                  onClick={limparAssinatura}>Limpar</button>
-                {assinaturaFeita && (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#1a7a05" }}>
-                    ✓ Assinatura capturada
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ── Enviar ── */}
-          <button type="submit" style={S.btnSubmit} disabled={loading}>
-            {loading ? "ENVIANDO..." : "ENVIAR FORMULÁRIO"}
-          </button>
-
-        </form>
-      </div>
-    </div>
-  );
-}
