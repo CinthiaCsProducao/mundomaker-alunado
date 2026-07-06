@@ -15,14 +15,18 @@ const SERIES = [
 
 const TURMAS = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P"];
 
+const ESTADOS = [
+  "AC","AL","AP","AM","BA","CE","DF","ES","GO","MA",
+  "MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN",
+  "RS","RO","RR","SC","SP","SE","TO"
+];
+
 function calcularCluster(total) {
   if (total >= 500) return "Diamond";
   if (total >= 300) return "Gold";
   if (total >= 100) return "Silver";
   return "Bronze";
 }
-
-
 
 const font = "'Circular Std', 'Nunito', 'Helvetica Neue', Arial, sans-serif";
 
@@ -64,9 +68,12 @@ const S = {
 };
 
 export default function AlunadoForm() {
+
   const [dadosGerais, setDadosGerais] = useState({
-    nome: "", endereco: "", telefone: "",
-    responsavel: "", data_inicio: "", data_recebimento: "", tipo_frete: "CIF",
+    nome: "", telefone: "", responsavel: "",
+    cep: "", rua: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "",
+    data_inicio: "", data_recebimento: "", tipo_frete: "CIF",
+    programa: "", idioma_material: "Português",
   });
   const [series, setSeries] = useState([]);
   const [calendario, setCalendario] = useState(null);
@@ -79,6 +86,8 @@ export default function AlunadoForm() {
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState(false);
+
+  const set = (campo, valor) => setDadosGerais(p => ({ ...p, [campo]: valor }));
 
   const totalAlunos = series.reduce(
     (acc, s) => acc + s.turmas.reduce((a, t) => a + (parseInt(t.num_alunos) || 0), 0), 0
@@ -140,6 +149,7 @@ export default function AlunadoForm() {
   function validar() {
     if (!dadosGerais.nome.trim()) return "Nome da escola é obrigatório.";
     if (!dadosGerais.responsavel.trim()) return "Responsável da escola é obrigatório.";
+    if (!dadosGerais.programa) return "Selecione o programa da escola.";
     if (series.length === 0) return "Adicione pelo menos uma série.";
     for (const s of series) {
       if (s.turmas.length === 0) return `A série '${s.serie}' precisa de ao menos uma turma.`;
@@ -157,10 +167,30 @@ export default function AlunadoForm() {
     const err = validar(); if (err) { setErro(err); return; }
     setLoading(true);
     try {
+      const enderecoCompleto = [
+        dadosGerais.rua, dadosGerais.numero, dadosGerais.complemento,
+        dadosGerais.bairro, dadosGerais.cidade, dadosGerais.estado, dadosGerais.cep
+      ].filter(Boolean).join(", ");
+
       const { data: escola, error: e1 } = await supabase.from("schools")
-        .insert([{ nome:dadosGerais.nome, endereco:dadosGerais.endereco, telefone:dadosGerais.telefone,
-          responsavel_escola:dadosGerais.responsavel, data_inicio:dadosGerais.data_inicio||null,
-          data_recebimento:dadosGerais.data_recebimento||null, tipo_frete:dadosGerais.tipo_frete }])
+        .insert([{
+          nome: dadosGerais.nome,
+          telefone: dadosGerais.telefone,
+          responsavel_escola: dadosGerais.responsavel,
+          endereco: enderecoCompleto,
+          cep: dadosGerais.cep,
+          rua: dadosGerais.rua,
+          numero: dadosGerais.numero,
+          complemento: dadosGerais.complemento || null,
+          bairro: dadosGerais.bairro,
+          cidade: dadosGerais.cidade,
+          estado: dadosGerais.estado,
+          data_inicio: dadosGerais.data_inicio || null,
+          data_recebimento: dadosGerais.data_recebimento || null,
+          tipo_frete: dadosGerais.tipo_frete,
+          programa: dadosGerais.programa,
+          idioma_material: dadosGerais.idioma_material,
+        }])
         .select().single();
       if (e1) throw e1;
       const sid = escola.id;
@@ -178,16 +208,14 @@ export default function AlunadoForm() {
         }
       }
 
-      let calUrlPublic = null;
-      let calNome = null;
+      let calUrlPublic = null, calNome = null;
       if (calendario) {
         const ext = calendario.name.split(".").pop();
         const nomeCal = `${sid}_calendario.${ext}`;
         const { error: e4 } = await supabase.storage.from("calendars").upload(nomeCal, calendario);
         if (e4) throw e4;
         const { data: calUrl } = supabase.storage.from("calendars").getPublicUrl(nomeCal);
-        calUrlPublic = calUrl.publicUrl;
-        calNome = calendario.name;
+        calUrlPublic = calUrl.publicUrl; calNome = calendario.name;
       }
 
       const canvas = canvasRef.current;
@@ -198,9 +226,10 @@ export default function AlunadoForm() {
       const { data: sigUrl } = supabase.storage.from("signatures").getPublicUrl(nomeSig);
 
       const { error: e6 } = await supabase.from("alunado_history").insert([{
-        school_id:sid, total_alunos:totalAlunos, cluster, responsavel_preenchimento:responsavel,
-        assinatura_url:sigUrl.publicUrl, calendario_url:calUrlPublic,
-        calendario_nome:calNome, dados_snapshot:{dadosGerais,series,totalAlunos,cluster} }]);
+        school_id: sid, total_alunos: totalAlunos, cluster, responsavel_preenchimento: responsavel,
+        assinatura_url: sigUrl.publicUrl, calendario_url: calUrlPublic,
+        calendario_nome: calNome, dados_snapshot: { dadosGerais, series, totalAlunos, cluster },
+      }]);
       if (e6) throw e6;
 
       setSucesso(true);
@@ -214,11 +243,8 @@ export default function AlunadoForm() {
       <div style={S.successCard}>
         <div style={{ fontSize: 52, marginBottom: 16 }}>✅</div>
         <div style={{ fontSize: 28, fontWeight: 800, color: "#111", marginBottom: 8 }}>dados enviados!</div>
-        <div style={{ fontSize: 14, color: "#555", marginBottom: 28 }}>
-          {dadosGerais.nome} — dados enviados com sucesso!
-        </div>
-        <button style={{ ...S.btn, ...S.btnBlack, padding: "12px 24px", fontSize: 13 }}
-          onClick={() => window.location.reload()}>NOVO FORMULÁRIO</button>
+        <div style={{ fontSize: 14, color: "#555", marginBottom: 28 }}>{dadosGerais.nome} — dados enviados com sucesso!</div>
+        <button style={{ ...S.btn, ...S.btnBlack, padding: "12px 24px", fontSize: 13 }} onClick={() => window.location.reload()}>NOVO FORMULÁRIO</button>
       </div>
     </div>
   );
@@ -244,68 +270,139 @@ export default function AlunadoForm() {
         <form onSubmit={handleSubmit}>
           {erro && <div style={{ ...S.error, marginTop: 24 }}>⚠ {erro}</div>}
 
+          {/* SEÇÃO 1 */}
           <div style={S.sectionBlock}>
-            <div style={S.sectionHead}>
-              <div style={S.sectionNum}>1</div>
-              <div style={S.sectionTitle}>Dados Gerais da Escola</div>
-            </div>
+            <div style={S.sectionHead}><div style={S.sectionNum}>1</div><div style={S.sectionTitle}>Dados Gerais da Escola</div></div>
             <div style={S.sectionBody}>
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <div style={S.field}>
-                  <label style={S.label}>Nome da Escola *</label>
-                  <input style={S.input} value={dadosGerais.nome}
-                    onChange={e => setDadosGerais({...dadosGerais, nome:e.target.value})}
-                    placeholder="Ex: Colégio São Paulo" />
-                </div>
-                <div style={S.field}>
-                  <label style={S.label}>Endereço</label>
-                  <input style={S.input} value={dadosGerais.endereco}
-                    onChange={e => setDadosGerais({...dadosGerais, endereco:e.target.value})}
-                    placeholder="Rua, número, bairro, cidade" />
-                </div>
+
+                {/* Nome + Responsável */}
                 <div style={S.grid2}>
                   <div style={S.field}>
-                    <label style={S.label}>Telefone</label>
-                    <input style={S.input} value={dadosGerais.telefone}
-                      onChange={e => setDadosGerais({...dadosGerais, telefone:e.target.value})}
-                      placeholder="(00) 00000-0000" />
+                    <label style={S.label}>Nome da Escola *</label>
+                    <input style={S.input} value={dadosGerais.nome} onChange={e => set("nome", e.target.value)} placeholder="Ex: Colégio São Paulo" />
                   </div>
                   <div style={S.field}>
                     <label style={S.label}>Responsável pelo Recebimento do Material *</label>
-                    <input style={S.input} value={dadosGerais.responsavel}
-                      onChange={e => setDadosGerais({...dadosGerais, responsavel:e.target.value})}
-                      placeholder="Nome do responsável" />
+                    <input style={S.input} value={dadosGerais.responsavel} onChange={e => set("responsavel", e.target.value)} placeholder="Nome do responsável" />
                   </div>
                 </div>
+
+                {/* Telefone */}
+                <div style={{ maxWidth: 300 }}>
+                  <div style={S.field}>
+                    <label style={S.label}>Telefone</label>
+                    <input style={S.input} value={dadosGerais.telefone} onChange={e => set("telefone", e.target.value)} placeholder="(00) 00000-0000" />
+                  </div>
+                </div>
+
+                {/* Separador endereço */}
+                <div style={{ borderTop: "1px solid #f0f0f0", paddingTop: 16 }}>
+                  <div style={{ ...S.label, marginBottom: 14, display: "block", color: "#888" }}>Endereço</div>
+
+                  {/* CEP + Rua + Número */}
+                  <div style={{ display: "grid", gridTemplateColumns: "140px 1fr 120px", gap: 16, marginBottom: 16 }}>
+                    <div style={S.field}>
+                      <label style={S.label}>CEP</label>
+                      <input style={S.input} value={dadosGerais.cep} onChange={e => set("cep", e.target.value)} placeholder="00000-000" maxLength={9} />
+                    </div>
+                    <div style={S.field}>
+                      <label style={S.label}>Rua / Logradouro</label>
+                      <input style={S.input} value={dadosGerais.rua} onChange={e => set("rua", e.target.value)} placeholder="Nome da rua, avenida, etc." />
+                    </div>
+                    <div style={S.field}>
+                      <label style={S.label}>Número</label>
+                      <input style={S.input} value={dadosGerais.numero} onChange={e => set("numero", e.target.value)} placeholder="Ex: 123" />
+                    </div>
+                  </div>
+
+                  {/* Complemento + Bairro */}
+                  <div style={S.grid2}>
+                    <div style={S.field}>
+                      <label style={S.label}>Complemento <span style={{ fontWeight: 400, opacity: 0.6 }}>(opcional)</span></label>
+                      <input style={S.input} value={dadosGerais.complemento} onChange={e => set("complemento", e.target.value)} placeholder="Apto, bloco, sala..." />
+                    </div>
+                    <div style={S.field}>
+                      <label style={S.label}>Bairro</label>
+                      <input style={S.input} value={dadosGerais.bairro} onChange={e => set("bairro", e.target.value)} placeholder="Nome do bairro" />
+                    </div>
+                  </div>
+
+                  {/* Cidade + Estado */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 16, marginTop: 16 }}>
+                    <div style={S.field}>
+                      <label style={S.label}>Cidade</label>
+                      <input style={S.input} value={dadosGerais.cidade} onChange={e => set("cidade", e.target.value)} placeholder="Nome da cidade" />
+                    </div>
+                    <div style={S.field}>
+                      <label style={S.label}>Estado</label>
+                      <select style={S.select} value={dadosGerais.estado} onChange={e => set("estado", e.target.value)}>
+                        <option value="">UF</option>
+                        {ESTADOS.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Datas + Frete */}
                 <div style={S.grid3}>
                   <div style={S.field}>
                     <label style={S.label}>Data de Início das Aulas</label>
-                    <input style={S.input} type="date" value={dadosGerais.data_inicio}
-                      onChange={e => setDadosGerais({...dadosGerais, data_inicio:e.target.value})} />
+                    <input style={S.input} type="date" value={dadosGerais.data_inicio} onChange={e => set("data_inicio", e.target.value)} />
                   </div>
                   <div style={S.field}>
                     <label style={S.label}>Data Desejada para Receber o Material</label>
-                    <input style={S.input} type="date" value={dadosGerais.data_recebimento}
-                      onChange={e => setDadosGerais({...dadosGerais, data_recebimento:e.target.value})} />
+                    <input style={S.input} type="date" value={dadosGerais.data_recebimento} onChange={e => set("data_recebimento", e.target.value)} />
                   </div>
                   <div style={S.field}>
                     <label style={S.label}>Tipo de Frete</label>
-                    <select style={S.select} value={dadosGerais.tipo_frete}
-                      onChange={e => setDadosGerais({...dadosGerais, tipo_frete:e.target.value})}>
+                    <select style={S.select} value={dadosGerais.tipo_frete} onChange={e => set("tipo_frete", e.target.value)}>
                       <option value="CIF">CIF — entrega MundoMaker</option>
                       <option value="FOB">FOB — escola retira</option>
                     </select>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          {/* SEÇÃO 2 */}
+          <div style={S.sectionBlock}>
+            <div style={S.sectionHead}><div style={S.sectionNum}>2</div><div style={S.sectionTitle}>Programa e Idioma do Material</div></div>
+            <div style={S.sectionBody}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                <div style={S.field}>
+                  <label style={S.label}>Programa *</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
+                    {["MakerLab Class", "MakerLab Oficina", "Inventores do Futuro"].map(p => (
+                      <button key={p} type="button"
+                        style={{ ...S.btn, ...(dadosGerais.programa === p ? S.btnGreen : S.btnOutline), fontSize: 13, padding: "10px 20px" }}
+                        onClick={() => set("programa", p)}>
+                        {dadosGerais.programa === p ? "✓ " : ""}{p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={S.field}>
+                  <label style={S.label}>Idioma do Material *</label>
+                  <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                    {["Português", "Inglês"].map(idioma => (
+                      <button key={idioma} type="button"
+                        style={{ ...S.btn, ...(dadosGerais.idioma_material === idioma ? S.btnGreen : S.btnOutline), fontSize: 13, padding: "10px 20px" }}
+                        onClick={() => set("idioma_material", idioma)}>
+                        {dadosGerais.idioma_material === idioma ? "✓ " : ""}{idioma}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* SEÇÃO 3 */}
           <div style={S.sectionBlock}>
-            <div style={S.sectionHead}>
-              <div style={S.sectionNum}>2</div>
-              <div style={S.sectionTitle}>Séries e Turmas</div>
-            </div>
+            <div style={S.sectionHead}><div style={S.sectionNum}>3</div><div style={S.sectionTitle}>Séries e Turmas</div></div>
             <div style={S.sectionBody}>
               <div style={{ marginBottom: 24 }}>
                 <div style={{ ...S.label, marginBottom: 10, display: "block" }}>Selecione as séries da escola:</div>
@@ -322,13 +419,11 @@ export default function AlunadoForm() {
                   })}
                 </div>
               </div>
-
               {series.map((s, si) => (
                 <div key={s.serie} style={{ border: "1.5px solid #e5e5e5", borderRadius: 4, marginBottom: 16, overflow: "hidden" }}>
                   <div style={{ background: "#f5f5f5", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1.5px solid #e5e5e5" }}>
                     <span style={{ fontWeight: 700, fontSize: 14, color: "#111" }}>{s.serie}</span>
-                    <button type="button" style={{ ...S.btn, ...S.btnDanger, padding: "5px 12px", fontSize: 11 }}
-                      onClick={() => removerSerie(si)}>remover série</button>
+                    <button type="button" style={{ ...S.btn, ...S.btnDanger, padding: "5px 12px", fontSize: 11 }} onClick={() => removerSerie(si)}>remover série</button>
                   </div>
                   <div style={{ padding: 16 }}>
                     <div style={{ display: "grid", gridTemplateColumns: "64px 1fr 1fr auto", gap: 8, marginBottom: 8 }}>
@@ -339,27 +434,19 @@ export default function AlunadoForm() {
                     {s.turmas.map((t, ti) => (
                       <div key={ti} style={{ display: "grid", gridTemplateColumns: "64px 1fr 1fr auto", gap: 8, marginBottom: 8, alignItems: "center" }}>
                         <div style={{ background: "#39DF18", color: "#000", borderRadius: 4, padding: "9px 0", textAlign: "center", fontWeight: 800, fontSize: 13 }}>{t.turma}</div>
-                        <input style={S.input} type="number" min={0} value={t.num_alunos}
-                          onChange={e => atualizarTurma(si,ti,"num_alunos",e.target.value)} placeholder="0" />
-                        <input style={S.input} value={t.professor_maker}
-                          onChange={e => atualizarTurma(si,ti,"professor_maker",e.target.value)} placeholder="Nome do professor" />
-                        {ti > 0
-                          ? <button type="button" style={{ ...S.btn, ...S.btnDanger, padding: "9px 10px" }}
-                              onClick={() => removerTurma(si,ti)}>✕</button>
-                          : <div />
-                        }
+                        <input style={S.input} type="number" min={0} value={t.num_alunos} onChange={e => atualizarTurma(si,ti,"num_alunos",e.target.value)} placeholder="0" />
+                        <input style={S.input} value={t.professor_maker} onChange={e => atualizarTurma(si,ti,"professor_maker",e.target.value)} placeholder="Nome do professor" />
+                        {ti > 0 ? <button type="button" style={{ ...S.btn, ...S.btnDanger, padding: "9px 10px" }} onClick={() => removerTurma(si,ti)}>✕</button> : <div />}
                       </div>
                     ))}
                     {s.turmas.length < 16 && (
-                      <button type="button" style={{ ...S.btn, ...S.btnOutline, fontSize: 12, marginTop: 4 }}
-                        onClick={() => adicionarTurma(si)}>
+                      <button type="button" style={{ ...S.btn, ...S.btnOutline, fontSize: 12, marginTop: 4 }} onClick={() => adicionarTurma(si)}>
                         + Turma {TURMAS[s.turmas.length] || ""}
                       </button>
                     )}
                   </div>
                 </div>
               ))}
-
               {series.length > 0 && (
                 <div style={{ background: "#111", borderRadius: 4, padding: "20px 24px", marginTop: 8 }}>
                   <div style={{ fontSize: 36, fontWeight: 800, color: "#39DF18", lineHeight: 1 }}>{totalAlunos}</div>
@@ -369,15 +456,12 @@ export default function AlunadoForm() {
             </div>
           </div>
 
+          {/* SEÇÃO 4 */}
           <div style={S.sectionBlock}>
-            <div style={S.sectionHead}>
-              <div style={S.sectionNum}>3</div>
-              <div style={S.sectionTitle}>Calendário Escolar <span style={{fontWeight:400, fontSize:11, opacity:0.6}}>(opcional)</span></div>
-            </div>
+            <div style={S.sectionHead}><div style={S.sectionNum}>4</div><div style={S.sectionTitle}>Calendário Escolar <span style={{fontWeight:400, fontSize:11, opacity:0.6}}>(opcional)</span></div></div>
             <div style={S.sectionBody}>
               <div style={S.uploadArea} onClick={() => document.getElementById("cal-input").click()}>
-                <input id="cal-input" type="file" accept=".pdf,.jpg,.jpeg,.png"
-                  style={{ display: "none" }} onChange={handleCalendario} />
+                <input id="cal-input" type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }} onChange={handleCalendario} />
                 {calendario ? (
                   <>
                     {calendarioPreview && <img src={calendarioPreview} alt="preview" style={{ maxHeight: 100, borderRadius: 4, marginBottom: 10 }} />}
@@ -395,33 +479,25 @@ export default function AlunadoForm() {
             </div>
           </div>
 
+          {/* SEÇÃO 5 */}
           <div style={S.sectionBlock}>
-            <div style={S.sectionHead}>
-              <div style={S.sectionNum}>4</div>
-              <div style={S.sectionTitle}>Responsável pelo Preenchimento</div>
-            </div>
+            <div style={S.sectionHead}><div style={S.sectionNum}>5</div><div style={S.sectionTitle}>Responsável pelo Preenchimento</div></div>
             <div style={S.sectionBody}>
               <div style={S.field}>
                 <label style={S.label}>Nome completo *</label>
-                <input style={S.input} value={responsavel}
-                  onChange={e => setResponsavel(e.target.value)}
-                  placeholder="Quem está preenchendo este formulário?" />
+                <input style={S.input} value={responsavel} onChange={e => setResponsavel(e.target.value)} placeholder="Quem está preenchendo este formulário?" />
               </div>
             </div>
           </div>
 
+          {/* SEÇÃO 6 */}
           <div style={S.sectionBlock}>
-            <div style={S.sectionHead}>
-              <div style={S.sectionNum}>5</div>
-              <div style={S.sectionTitle}>Assinatura Digital</div>
-            </div>
+            <div style={S.sectionHead}><div style={S.sectionNum}>6</div><div style={S.sectionTitle}>Assinatura Digital</div></div>
             <div style={S.sectionBody}>
               <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>Assine abaixo com o mouse ou dedo (touch):</div>
               <canvas ref={canvasRef} width={760} height={160} style={S.canvas}
-                onMouseDown={iniciarDesenho} onMouseMove={desenhar}
-                onMouseUp={pararDesenho} onMouseLeave={pararDesenho}
-                onTouchStart={iniciarDesenho} onTouchMove={desenhar} onTouchEnd={pararDesenho}
-              />
+                onMouseDown={iniciarDesenho} onMouseMove={desenhar} onMouseUp={pararDesenho} onMouseLeave={pararDesenho}
+                onTouchStart={iniciarDesenho} onTouchMove={desenhar} onTouchEnd={pararDesenho} />
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
                 <button type="button" style={{ ...S.btn, ...S.btnDanger }} onClick={limparAssinatura}>Limpar</button>
                 {assinaturaFeita && <span style={{ fontSize: 12, fontWeight: 700, color: "#1a7a05" }}>✓ Assinatura capturada</span>}
