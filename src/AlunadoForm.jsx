@@ -681,3 +681,68 @@ export default function AlunadoForm() {
                 ) : (
                   <>
                     <div style={{ fontSize: 32, marginBottom: 8 }}>📁</div>
+                    <div style={{ fontWeight: 700, color: "#111", fontSize: 14 }}>
+                      Clique para anexar o calendário
+                    </div>
+                    <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
+                      PDF, JPG ou PNG — máx. 10MB
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── SEÇÃO 5: Responsável ── */}
+          <div style={S.sectionBlock}>
+            <div style={S.sectionHead}>
+              <div style={S.sectionNum}>5</div>
+              <div style={S.sectionTitle}>Responsável pelo Preenchimento</div>
+            </div>
+            <div style={S.sectionBody}>
+              <div style={S.field}>
+                <label style={S.label}>Nome completo *</label>
+                <input style={S.input} value={responsavel}
+                  onChange={e => setResponsavel(e.target.value)}
+                  placeholder="Quem está preenchendo este formulário?" />
+              </div>
+            </div>
+          </div>
+
+          {/* ── SEÇÃO 6: Assinatura ── */}
+          <div style={S.sectionBlock}>
+            <div style={S.sectionHead}>
+              <div style={S.sectionNum}>6</div>
+              <div style={S.sectionTitle}>Assinatura Digital</div>
+            </div>
+            <div style={S.sectionBody}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
+                Assine abaixo com o mouse ou dedo (touch):
+              </div>
+              <canvas ref={canvasRef} width={760} height={160} style={S.canvas}
+                onMouseDown={iniciarDesenho} onMouseMove={desenhar}
+                onMouseUp={pararDesenho} onMouseLeave={pararDesenho}
+                onTouchStart={iniciarDesenho} onTouchMove={desenhar} onTouchEnd={pararDesenho}
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
+                <button type="button" style={{ ...S.btn, ...S.btnDanger }}
+                  onClick={limparAssinatura}>Limpar</button>
+                {assinaturaFeita && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#1a7a05" }}>
+                    ✓ Assinatura capturada
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Enviar ── */}
+          <button type="submit" style={S.btnSubmit} disabled={loading}>
+            {loading ? "ENVIANDO..." : "ENVIAR FORMULÁRIO"}
+          </button>
+
+        </form>
+      </div>
+    </div>
+  );
+}
