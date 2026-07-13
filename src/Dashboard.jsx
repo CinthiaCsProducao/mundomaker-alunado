@@ -848,20 +848,20 @@ function InspiramakerDashboard({ onVoltar }) {
   const TURMA_LABELS = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P"];
 
   function calcularComplementar(projeto, serie, numSalas) {
-    const p        = removerAcentos((projeto || "").toLowerCase().trim());
-    const base     = serie.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0);
+    const p         = removerAcentos((projeto || "").toLowerCase().trim()).replace(/[^a-z0-9 ]/g, "").trim();
+    const base      = serie.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0);
     const numTurmas = serie.turmas.length;
-    if (p === "nascer do sol")          return numSalas || 0;
-    if (p === "nossa agua")             return 1;
-    if (p === "dinossauros")            return Math.ceil(base / 5);
-    if (p === "medalhoes")              return Math.ceil(base / 7);
-    if (p === "telegrafo")              return numTurmas;
-    if (p === "navegadores")            return 1;
-    if (p.includes("atraves da lente")) return Math.ceil(base / 7);
-    if (p === "comunicamao")            return numTurmas;
-    if (p.includes("tres porquinhos")) return numSalas || 0;
-    if (p === "locomotiva")             return numTurmas;
-    if (p === "enigma")                 return numSalas || 0;
+    if (p === "nascer do sol"           || p === "here comes the sun")   return numSalas || 0;
+    if (p === "nossa agua"              || p === "sustainable me")        return 1;
+    if (p === "dinossauros"             || p === "fossil hunters")        return Math.ceil(base / 5);
+    if (p === "medalhoes"               || p === "ancient civilization")  return Math.ceil(base / 7);
+    if (p === "telegrafo"               || p === "can you hear me")       return numTurmas;
+    if (p === "navegadores"             || p === "sea explorers")         return 1;
+    if (p.includes("atraves da lente") || p === "light camera action")   return Math.ceil(base / 7);
+    if (p === "comunicamao"             || p === "lend a hand")           return numTurmas;
+    if (p.includes("tres porquinhos")  || p === "three maker piggies")   return numSalas || 0;
+    if (p === "locomotiva"              || p === "all aboard")            return numTurmas;
+    if (p === "enigma"                  || p === "enigmaker")             return numSalas || 0;
     return 0;
   }
 
