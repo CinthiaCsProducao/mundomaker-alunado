@@ -911,7 +911,8 @@ function InspiramakerDashboard({ onVoltar }) {
           turmas: cl.filter(t => t.grade_class_id === s.id).sort((a, b) => (a.turma || "").localeCompare(b.turma || "")),
         }));
         return { id: escola.id, nome: escola.nome, idioma: escola.idioma_material || "Portugues", numSalas: escola.num_salas_maker || 0, series };
-      });
+      // Só exibe escolas que têm pelo menos 1 aluno no ciclo atual
+      }).filter(e => e.series.some(s => s.turmas.some(t => (t.num_alunos || 0) > 0)));
 
       setDados(resultado);
       setLoading(false);
