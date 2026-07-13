@@ -194,6 +194,7 @@ export default function AlunadoForm() {
     telefone: "",
     responsavel: "", data_inicio: "", data_recebimento: "", tipo_frete: "CIF",
     programa: "", idioma_material: "Português",
+    num_salas_maker: "",
   });
   const [series, setSeries] = useState([]);
   const [calendario, setCalendario] = useState(null);
@@ -312,6 +313,7 @@ export default function AlunadoForm() {
           tipo_frete: dadosGerais.tipo_frete,
           programa: dadosGerais.programa,
           idioma_material: dadosGerais.idioma_material,
+          num_salas_maker: parseInt(dadosGerais.num_salas_maker) || 0,
         }])
         .select().single();
       if (e1) throw e1;
@@ -519,6 +521,14 @@ export default function AlunadoForm() {
                       <option value="CIF">CIF — entrega MundoMaker</option>
                       <option value="FOB">FOB — escola retira</option>
                     </select>
+                  </div>
+                </div>
+                <div style={{ maxWidth: 240 }}>
+                  <div style={S.field}>
+                    <label style={S.label}>Quantas salas maker a escola possui?</label>
+                    <input style={S.input} type="number" min="0" value={dadosGerais.num_salas_maker}
+                      onChange={e => setDadosGerais({...dadosGerais, num_salas_maker:e.target.value})}
+                      placeholder="0" />
                   </div>
                 </div>
               </div>

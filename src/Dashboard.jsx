@@ -840,11 +840,34 @@ function EscolasDashboard({ onVoltar }) {
 }
 
 function InspiramakerDashboard({ onVoltar }) {
-  const [dados, setDados]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [busca, setBusca]   = useState("");
+  const [dados, setDados]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [busca, setBusca]       = useState("");
+  const [projetos, setProjetos] = useState({});
 
   const TURMA_LABELS = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P"];
+
+  function calcularComplementar(projeto, serie, numSalas) {
+    const p        = removerAcentos((projeto || "").toLowerCase().trim());
+    const base     = serie.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0);
+    const numTurmas = serie.turmas.length;
+    if (p === "nascer do sol")          return numSalas || 0;
+    if (p === "nossa agua")             return 1;
+    if (p === "dinossauros")            return Math.ceil(base / 5);
+    if (p === "medalhoes")              return Math.ceil(base / 7);
+    if (p === "telegrafo")              return numTurmas;
+    if (p === "navegadores")            return 1;
+    if (p.includes("atraves da lente")) return Math.ceil(base / 7);
+    if (p === "comunicamao")            return numTurmas;
+    if (p.includes("tres porquinhos")) return numSalas || 0;
+    if (p === "locomotiva")             return numTurmas;
+    if (p === "enigma")                 return numSalas || 0;
+    return 0;
+  }
+
+  async function salvarProjeto(gcId, valor) {
+    await supabase.from("grade_classes").update({ projeto: valor }).eq("id", gcId);
+  }
 
   useEffect(() => {
     async function carregar() {
@@ -871,18 +894,23 @@ function InspiramakerDashboard({ onVoltar }) {
 
       const ids = escolasUnicas.map(e => e.id);
       const [{ data: allGC }, { data: allCL }] = await Promise.all([
-        supabase.from("grade_classes").select("id, school_id, serie, ordem").in("school_id", ids).order("ordem"),
+        supabase.from("grade_classes").select("id, school_id, serie, ordem, projeto").in("school_id", ids).order("ordem"),
         supabase.from("classes").select("grade_class_id, school_id, turma, num_alunos").in("school_id", ids).order("turma"),
       ]);
+
+      const projetosInit = {};
+      (allGC || []).forEach(gc => { if (gc.projeto) projetosInit[gc.id] = gc.projeto; });
+      setProjetos(projetosInit);
 
       const resultado = escolasUnicas.map(escola => {
         const gc = (allGC || []).filter(g => g.school_id === escola.id);
         const cl = (allCL || []).filter(c => c.school_id === escola.id);
         const series = gc.map(s => ({
+          gcId: s.id,
           serie: s.serie,
           turmas: cl.filter(t => t.grade_class_id === s.id).sort((a, b) => (a.turma || "").localeCompare(b.turma || "")),
         }));
-        return { id: escola.id, nome: escola.nome, idioma: escola.idioma_material || "Portugues", series };
+        return { id: escola.id, nome: escola.nome, idioma: escola.idioma_material || "Portugues", numSalas: escola.num_salas_maker || 0, series };
       });
 
       setDados(resultado);
@@ -898,10 +926,13 @@ function InspiramakerDashboard({ onVoltar }) {
   let totalAlunosGeral = 0;
   let totalBaseGeral   = 0;
   let totalProfGeral   = 0;
+  let totalCompGeral   = 0;
   filtrados.forEach(e => e.series.forEach(s => {
     totalAlunosGeral += s.turmas.reduce((a, t) => a + (t.num_alunos || 0), 0);
     totalBaseGeral   += s.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0);
     totalProfGeral   += 1;
+    const comp = calcularComplementar(projetos[s.gcId] || "", s, e.numSalas);
+    if (typeof comp === "number") totalCompGeral += comp;
   }));
 
   function gerarPlanilha() {
@@ -918,15 +949,19 @@ function InspiramakerDashboard({ onVoltar }) {
         }).join("");
         const tot  = s.turmas.reduce((a, t) => a + (t.num_alunos || 0), 0);
         const base = s.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0);
+        const proj = projetos[s.gcId] || "";
+        const comp = calcularComplementar(proj, s, escola.numSalas);
         rows += `
           <tr style="background:${si % 2 === 0 ? "#fff" : "#f9f9f9"}">
             <td style="padding:5px 10px;border:1px solid #ddd;">${si === 0 ? escola.idioma : ""}</td>
             <td style="padding:5px 10px;border:1px solid #ddd;font-weight:${si === 0 ? "700" : "400"}">${si === 0 ? escola.nome : ""}</td>
+            <td style="padding:5px 10px;border:1px solid #ddd;">${proj}</td>
             <td style="text-align:center;padding:5px 10px;border:1px solid #ddd;">${s.serie}</td>
             ${cols}
             <td style="text-align:center;font-weight:700;padding:5px 10px;border:1px solid #ddd;">${tot}</td>
             <td style="text-align:center;font-weight:800;padding:5px 10px;border:1px solid #ddd;background:#e8f5e9;">${base}</td>
             <td style="text-align:center;padding:5px 10px;border:1px solid #ddd;">1</td>
+            <td style="text-align:center;font-weight:800;padding:5px 10px;border:1px solid #ddd;background:#fff3e0;">${comp}</td>
           </tr>`;
       });
     });
@@ -954,21 +989,24 @@ function InspiramakerDashboard({ onVoltar }) {
           <tr>
             <th style="padding:6px 10px;background:#111;color:#fff;border:1px solid #333;text-align:left;">Idioma</th>
             <th style="padding:6px 10px;background:#111;color:#fff;border:1px solid #333;text-align:left;">Escola/Turma</th>
+            <th style="padding:6px 10px;background:#111;color:#fff;border:1px solid #333;text-align:left;">Projeto</th>
             <th style="padding:6px 10px;background:#111;color:#fff;border:1px solid #333;text-align:center;">Ano Escolar</th>
             ${headerCols}
             <th style="padding:6px 10px;background:#111;color:#fff;border:1px solid #333;text-align:center;">Alunado Total</th>
             <th style="padding:6px 10px;background:#39DF18;color:#000;border:1px solid #333;text-align:center;font-style:italic;">Base</th>
             <th style="padding:6px 10px;background:#111;color:#fff;border:1px solid #333;text-align:center;">Professor</th>
+            <th style="padding:6px 10px;background:#FFA300;color:#000;border:1px solid #333;text-align:center;font-style:italic;">Complementar</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
         <tfoot>
           <tr style="background:#111;">
-            <td colspan="3" style="padding:8px 10px;color:#fff;font-weight:700;border:1px solid #333;">TOTAL GERAL</td>
+            <td colspan="4" style="padding:8px 10px;color:#fff;font-weight:700;border:1px solid #333;">TOTAL GERAL</td>
             ${TURMA_LABELS.slice(0, maxTurmas).map(() => `<td style="border:1px solid #333;"></td>`).join("")}
             <td style="padding:8px 10px;color:#fff;font-weight:800;text-align:center;border:1px solid #333;">${totalAlunosGeral}</td>
             <td style="padding:8px 10px;color:#39DF18;font-weight:800;text-align:center;border:1px solid #333;">${totalBaseGeral}</td>
             <td style="padding:8px 10px;color:#aaa;text-align:center;border:1px solid #333;">${totalProfGeral}</td>
+            <td style="padding:8px 10px;color:#FFA300;font-weight:800;text-align:center;border:1px solid #333;">${totalCompGeral}</td>
           </tr>
         </tfoot>
       </table>
@@ -991,17 +1029,21 @@ function InspiramakerDashboard({ onVoltar }) {
         <div style={{ textAlign: "center", padding: 60, color: "#aaa", fontSize: 15 }}>Carregando...</div>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
             <div style={{ background: "#111", borderRadius: 8, padding: "20px 24px" }}>
-              <div style={{ fontSize: 44, fontWeight: 800, color: "#39DF18", lineHeight: 1 }}>{totalBaseGeral.toLocaleString("pt-BR")}</div>
+              <div style={{ fontSize: 40, fontWeight: 800, color: "#39DF18", lineHeight: 1 }}>{totalBaseGeral.toLocaleString("pt-BR")}</div>
               <div style={{ fontSize: 11, color: "#aaa", textTransform: "uppercase", marginTop: 4 }}>Caixas Inspiramaker</div>
             </div>
+            <div style={{ background: "#FFA300", borderRadius: 8, padding: "20px 24px" }}>
+              <div style={{ fontSize: 40, fontWeight: 800, color: "#000", lineHeight: 1 }}>{totalCompGeral.toLocaleString("pt-BR")}</div>
+              <div style={{ fontSize: 11, color: "#333", textTransform: "uppercase", marginTop: 4 }}>Total Complementar</div>
+            </div>
             <div style={{ background: "#fff", borderRadius: 8, padding: "20px 24px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
-              <div style={{ fontSize: 44, fontWeight: 800, color: "#111", lineHeight: 1 }}>{totalAlunosGeral.toLocaleString("pt-BR")}</div>
+              <div style={{ fontSize: 40, fontWeight: 800, color: "#111", lineHeight: 1 }}>{totalAlunosGeral.toLocaleString("pt-BR")}</div>
               <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", marginTop: 4 }}>Total de Alunos</div>
             </div>
             <div style={{ background: "#fff", borderRadius: 8, padding: "20px 24px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
-              <div style={{ fontSize: 44, fontWeight: 800, color: "#111", lineHeight: 1 }}>{filtrados.length}</div>
+              <div style={{ fontSize: 40, fontWeight: 800, color: "#111", lineHeight: 1 }}>{filtrados.length}</div>
               <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", marginTop: 4 }}>Escolas MakerLab</div>
             </div>
           </div>
@@ -1024,6 +1066,7 @@ function InspiramakerDashboard({ onVoltar }) {
                   <tr style={{ background: "#f5f5f5" }}>
                     <th style={{ padding: "8px 14px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", whiteSpace: "nowrap" }}>Idioma</th>
                     <th style={{ padding: "8px 14px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", whiteSpace: "nowrap" }}>Escola / Turma</th>
+                    <th style={{ padding: "8px 14px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", whiteSpace: "nowrap" }}>Projeto</th>
                     <th style={{ padding: "8px 14px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", whiteSpace: "nowrap" }}>Ano Escolar</th>
                     {labels.map(l => (
                       <th key={l} style={{ padding: "8px 6px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", width: 44 }}>{l}</th>
@@ -1031,21 +1074,32 @@ function InspiramakerDashboard({ onVoltar }) {
                     <th style={{ padding: "8px 14px", textAlign: "right", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", whiteSpace: "nowrap" }}>Total</th>
                     <th style={{ padding: "8px 14px", textAlign: "right", fontSize: 10, fontWeight: 700, color: "#39DF18", textTransform: "uppercase", whiteSpace: "nowrap", fontStyle: "italic" }}>Base</th>
                     <th style={{ padding: "8px 14px", textAlign: "center", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase" }}>Prof.</th>
+                    <th style={{ padding: "8px 14px", textAlign: "right", fontSize: 10, fontWeight: 700, color: "#FFA300", textTransform: "uppercase", whiteSpace: "nowrap", fontStyle: "italic" }}>Compl.</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtrados.length === 0 ? (
-                    <tr><td colSpan={4 + labels.length} style={{ padding: 32, textAlign: "center", color: "#aaa" }}>Nenhuma escola MakerLab Oficina cadastrada.</td></tr>
+                    <tr><td colSpan={5 + labels.length} style={{ padding: 32, textAlign: "center", color: "#aaa" }}>Nenhuma escola MakerLab Oficina cadastrada.</td></tr>
                   ) : filtrados.map(escola =>
                     escola.series.map((s, si) => {
-                      const tot  = s.turmas.reduce((a, t) => a + (t.num_alunos || 0), 0);
-                      const base = s.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0);
+                      const tot    = s.turmas.reduce((a, t) => a + (t.num_alunos || 0), 0);
+                      const base   = s.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0);
+                      const comp   = calcularComplementar(projetos[s.gcId] || "", s, escola.numSalas);
                       const primeiro = si === 0;
                       const ultimo   = si === escola.series.length - 1;
                       return (
                         <tr key={`${escola.id}-${s.serie}`} style={{ borderTop: primeiro ? "2px solid #ddd" : "1px solid #f0f0f0", background: si % 2 === 0 ? "#fff" : "#fafafa" }}>
                           <td style={{ padding: "8px 14px", color: "#555", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{primeiro ? escola.idioma : ""}</td>
                           <td style={{ padding: "8px 14px", fontWeight: primeiro ? 700 : 400, color: "#111", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{primeiro ? escola.nome : ""}</td>
+                          <td style={{ padding: "4px 8px", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>
+                            <input
+                              value={projetos[s.gcId] || ""}
+                              onChange={e => setProjetos(p => ({ ...p, [s.gcId]: e.target.value }))}
+                              onBlur={e => salvarProjeto(s.gcId, e.target.value)}
+                              placeholder="Digite o projeto..."
+                              style={{ width: 140, padding: "5px 8px", border: "1.5px solid #ddd", borderRadius: 4, fontSize: 11, fontFamily: font, background: "#fff" }}
+                            />
+                          </td>
                           <td style={{ padding: "8px 10px", textAlign: "center", color: "#555", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{s.serie}</td>
                           {labels.map((_, i) => {
                             const t = s.turmas[i];
@@ -1058,6 +1112,7 @@ function InspiramakerDashboard({ onVoltar }) {
                           <td style={{ padding: "8px 14px", textAlign: "right", fontWeight: 700, borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{tot}</td>
                           <td style={{ padding: "8px 14px", textAlign: "right", fontWeight: 800, color: "#39DF18", fontSize: 14, background: "#f9fff5", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{base}</td>
                           <td style={{ padding: "8px 14px", textAlign: "center", color: "#888", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>1</td>
+                          <td style={{ padding: "8px 14px", textAlign: "right", fontWeight: 800, color: "#FFA300", fontSize: 14, background: "#fff8f0", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{comp}</td>
                         </tr>
                       );
                     })
@@ -1066,11 +1121,12 @@ function InspiramakerDashboard({ onVoltar }) {
                 {filtrados.length > 0 && (
                   <tfoot>
                     <tr style={{ background: "#111" }}>
-                      <td colSpan={3} style={{ padding: "10px 14px", fontWeight: 700, color: "#fff", fontSize: 12 }}>TOTAL GERAL</td>
+                      <td colSpan={4} style={{ padding: "10px 14px", fontWeight: 700, color: "#fff", fontSize: 12 }}>TOTAL GERAL</td>
                       {labels.map((_, i) => <td key={i} />)}
                       <td style={{ padding: "10px 14px", fontWeight: 800, textAlign: "right", color: "#fff" }}>{totalAlunosGeral.toLocaleString("pt-BR")}</td>
                       <td style={{ padding: "10px 14px", fontWeight: 800, textAlign: "right", color: "#39DF18", fontSize: 16 }}>{totalBaseGeral.toLocaleString("pt-BR")}</td>
                       <td style={{ padding: "10px 14px", textAlign: "center", color: "#aaa" }}>{totalProfGeral}</td>
+                      <td style={{ padding: "10px 14px", fontWeight: 800, textAlign: "right", color: "#FFA300", fontSize: 16 }}>{totalCompGeral.toLocaleString("pt-BR")}</td>
                     </tr>
                   </tfoot>
                 )}
