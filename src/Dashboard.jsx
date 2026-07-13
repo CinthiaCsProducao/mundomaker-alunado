@@ -1207,6 +1207,12 @@ function ModalDetalhes({ escola, onClose, onDelete, isAdmin }) {
             <div><div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Tipo de Frete</div><div style={{ fontWeight: 600, color: "#222", marginTop: 2 }}>{escola.tipo_frete || "—"}</div></div>
             <div><div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Inicio das Aulas</div><div style={{ fontWeight: 600, color: "#222", marginTop: 2 }}>{escola.data_inicio ? new Date(escola.data_inicio + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</div></div>
             <div><div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Recebimento do Material</div><div style={{ fontWeight: 600, color: "#222", marginTop: 2 }}>{escola.data_recebimento ? new Date(escola.data_recebimento + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</div></div>
+            {escola.num_salas_maker != null && (
+              <div>
+                <div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Salas Maker</div>
+                <div style={{ fontWeight: 600, color: "#222", marginTop: 2 }}>{escola.num_salas_maker}</div>
+              </div>
+            )}
           </div>
         </div>
         {(escola.programa || escola.idioma_material) && (
