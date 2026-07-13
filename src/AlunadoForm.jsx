@@ -302,22 +302,41 @@ export default function AlunadoForm() {
         dadosGerais.cep,
       ].filter(Boolean).join(", ");
 
-      const { data: escola, error: e1 } = await supabase.from("schools")
-        .insert([{
-          nome: dadosGerais.nome,
-          endereco: enderecoCompleto,
-          telefone: dadosGerais.telefone,
-          responsavel_escola: dadosGerais.responsavel,
-          data_inicio: dadosGerais.data_inicio || null,
-          data_recebimento: dadosGerais.data_recebimento || null,
-          tipo_frete: dadosGerais.tipo_frete,
-          programa: dadosGerais.programa,
-          idioma_material: dadosGerais.idioma_material,
-          num_salas_maker: parseInt(dadosGerais.num_salas_maker) || 0,
-        }])
-        .select().single();
-      if (e1) throw e1;
-      const sid = escola.id;
+      const escolaPayload = {
+        endereco: enderecoCompleto,
+        telefone: dadosGerais.telefone,
+        responsavel_escola: dadosGerais.responsavel,
+        data_inicio: dadosGerais.data_inicio || null,
+        data_recebimento: dadosGerais.data_recebimento || null,
+        tipo_frete: dadosGerais.tipo_frete,
+        programa: dadosGerais.programa,
+        idioma_material: dadosGerais.idioma_material,
+        num_salas_maker: parseInt(dadosGerais.num_salas_maker) || 0,
+      };
+
+      // Busca escola existente pelo nome (case-insensitive)
+      const { data: existentes } = await supabase.from("schools")
+        .select("id").ilike("nome", dadosGerais.nome.trim());
+
+      let sid;
+      if (existentes && existentes.length > 0) {
+        // Atualiza escola existente
+        sid = existentes[0].id;
+        const { error: e1 } = await supabase.from("schools").update(escolaPayload).eq("id", sid);
+        if (e1) throw e1;
+        // Remove séries e turmas antigas desta escola
+        const { data: oldGC } = await supabase.from("grade_classes").select("id").eq("school_id", sid);
+        if (oldGC && oldGC.length > 0) {
+          await supabase.from("classes").delete().in("grade_class_id", oldGC.map(g => g.id));
+          await supabase.from("grade_classes").delete().eq("school_id", sid);
+        }
+      } else {
+        // Insere nova escola
+        const { data: nova, error: e1 } = await supabase.from("schools")
+          .insert([{ nome: dadosGerais.nome, ...escolaPayload }]).select().single();
+        if (e1) throw e1;
+        sid = nova.id;
+      }
 
       for (let i=0; i<series.length; i++) {
         const s = series[i];

@@ -1672,6 +1672,11 @@ export default function Dashboard() {
         snapshot:          escolas,
       }).eq("id", cicloAtivo.id);
 
+      // Zera alunos de todas as turmas para o novo ciclo
+      await supabase.from("classes").update({ num_alunos: 0 }).gte("num_alunos", 0);
+      // Limpa histórico para zerar contadores do dashboard
+      await supabase.from("alunado_history").delete().gte("total_alunos", 0);
+
       await supabase.from("ciclos").insert({
         nome:        "Novo Ciclo",
         data_inicio: new Date().toISOString(),
