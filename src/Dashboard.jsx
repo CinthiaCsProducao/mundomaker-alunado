@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import BaseEscolas from "./BaseEscolas";
 import GerenciarUsuarios from "./GerenciarUsuarios";
+import CortesDashboard from "./CortesDashboard";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -1828,6 +1829,12 @@ export default function Dashboard() {
               Base Escolas
             </button>
           )}
+          {perm.projecao && (
+            <button onClick={() => setView(view === "cortes" ? "dashboard" : "cortes")}
+              style={{ background: view === "cortes" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+              Conf. Cortes
+            </button>
+          )}
           {isAdmin && (
             <button onClick={() => setView(view === "usuarios" ? "dashboard" : "usuarios")}
               style={{ background: view === "usuarios" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
@@ -1866,6 +1873,10 @@ export default function Dashboard() {
 
       {view === "baseescolas" && (
         <BaseEscolas onVoltar={() => setView("dashboard")} />
+      )}
+
+      {view === "cortes" && (
+        <CortesDashboard onVoltar={() => setView("dashboard")} />
       )}
 
       {view === "usuarios" && (
