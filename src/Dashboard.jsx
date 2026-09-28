@@ -839,6 +839,238 @@ function EscolasDashboard({ onVoltar }) {
   );
 }
 
+// ─── Base Escolas Dashboard ──────────────────────────────────
+function BaseEscolasDashboard({ onVoltar }) {
+  const [escolas, setEscolas]     = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [busca, setBusca]         = useState("");
+  const [selecionada, setSelecionada] = useState(null);
+  const [projetos, setProjetos]   = useState([]);
+  const [loadingProj, setLoadingProj] = useState(false);
+  const [salvando, setSalvando]   = useState(false);
+  const [envioVer, setEnvioVer]   = useState(1);
+  const [novoProj, setNovoProj]   = useState({ serie:"", envio_1:"", envio_2:"", envio_3:"" });
+
+  const BASE_URL = window.location.origin;
+
+  useEffect(() => {
+    async function carregar() {
+      setLoading(true);
+      const { data } = await supabase.from("base_escolas").select("id, data").order("id");
+      setEscolas((data || []).map(r => ({ id: r.id, ...r.data })));
+      setLoading(false);
+    }
+    carregar();
+  }, []);
+
+  async function abrirEscola(escola) {
+    setSelecionada(escola);
+    setLoadingProj(true);
+    const { data } = await supabase.from("projetos_escola").select("*").eq("escola_id", escola.id).order("serie");
+    setProjetos(data || []);
+    setLoadingProj(false);
+  }
+
+  async function salvarProjeto(proj) {
+    setSalvando(true);
+    if (proj.id) {
+      await supabase.from("projetos_escola").update({ envio_1:proj.envio_1, envio_2:proj.envio_2, envio_3:proj.envio_3 }).eq("id", proj.id);
+    } else {
+      const { data } = await supabase.from("projetos_escola").insert([{ escola_id:selecionada.id, serie:proj.serie, envio_1:proj.envio_1||null, envio_2:proj.envio_2||null, envio_3:proj.envio_3||null }]).select().single();
+      if (data) setProjetos(p => [...p, data]);
+    }
+    setSalvando(false);
+  }
+
+  async function adicionarSerie() {
+    if (!novoProj.serie.trim()) return;
+    await salvarProjeto({ ...novoProj, envio_1:novoProj.envio_1||null, envio_2:novoProj.envio_2||null, envio_3:novoProj.envio_3||null });
+    const { data } = await supabase.from("projetos_escola").select("*").eq("escola_id", selecionada.id).order("serie");
+    setProjetos(data || []);
+    setNovoProj({ serie:"", envio_1:"", envio_2:"", envio_3:"" });
+  }
+
+  async function removerSerie(id) {
+    await supabase.from("projetos_escola").delete().eq("id", id);
+    setProjetos(p => p.filter(x => x.id !== id));
+  }
+
+  function copiarLink(envio) {
+    const url = `${BASE_URL}/formulario?escola=${selecionada.id}&envio=${envio}`;
+    navigator.clipboard.writeText(url);
+  }
+
+  const filtradas = escolas.filter(e => (e.nome||"").toLowerCase().includes(busca.toLowerCase()) || (e.cidade||"").toLowerCase().includes(busca.toLowerCase()));
+  const CLUSTER_COR = { Diamante:"#e0f2fe", Ouro:"#fefce8", Prata:"#f4f4f5", Bronze:"#fdf4e7" };
+
+  return (
+    <div style={{ maxWidth:1300, margin:"0 auto", padding:"32px 20px", fontFamily:font }}>
+      <div style={{ marginBottom:24 }}>
+        <button onClick={onVoltar} style={{ background:"none", border:"none", color:"#666", fontSize:13, cursor:"pointer", fontFamily:font, padding:0, marginBottom:8, display:"block" }}>
+          Voltar ao Dashboard
+        </button>
+        <div style={{ fontSize:26, fontWeight:800, color:"#111" }}>Base de Escolas</div>
+        <div style={{ fontSize:13, color:"#666", marginTop:4 }}>Gerencie projetos por envio e gere links de formulário</div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns: selecionada ? "340px 1fr" : "1fr", gap:20 }}>
+        {/* Lista de escolas */}
+        <div style={{ background:"#fff", borderRadius:8, boxShadow:"0 1px 4px rgba(0,0,0,0.08)", overflow:"hidden" }}>
+          <div style={{ background:"#111", padding:"12px 16px" }}>
+            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar escola..."
+              style={{ width:"100%", padding:"8px 12px", borderRadius:4, border:"none", fontSize:13, fontFamily:font, boxSizing:"border-box" }}/>
+          </div>
+          <div style={{ maxHeight:600, overflowY:"auto" }}>
+            {loading ? (
+              <div style={{ padding:24, textAlign:"center", color:"#aaa" }}>Carregando...</div>
+            ) : filtradas.map(e => (
+              <div key={e.id} onClick={() => abrirEscola(e)}
+                style={{ padding:"12px 16px", borderBottom:"1px solid #f0f0f0", cursor:"pointer", background: selecionada?.id===e.id ? "#f0fdf4" : "transparent", borderLeft: selecionada?.id===e.id ? "3px solid #39DF18" : "3px solid transparent" }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#111" }}>{e.nome}</div>
+                <div style={{ fontSize:11, color:"#888", marginTop:2, display:"flex", gap:8 }}>
+                  <span style={{ background:CLUSTER_COR[e.cluster]||"#f5f5f5", borderRadius:3, padding:"1px 6px", fontWeight:600 }}>{e.cluster}</span>
+                  <span>{e.tipo}</span>
+                  <span>{e.cidade}/{e.uf}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ padding:"8px 16px", background:"#f9f9f9", fontSize:11, color:"#aaa", borderTop:"1px solid #eee" }}>
+            {filtradas.length} de {escolas.length} escolas
+          </div>
+        </div>
+
+        {/* Painel da escola selecionada */}
+        {selecionada && (
+          <div style={{ background:"#fff", borderRadius:8, boxShadow:"0 1px 4px rgba(0,0,0,0.08)", overflow:"hidden" }}>
+            {/* Header escola */}
+            <div style={{ background:"#111", padding:"16px 20px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                <div>
+                  <div style={{ fontSize:18, fontWeight:800, color:"#fff" }}>{selecionada.nome}</div>
+                  <div style={{ fontSize:12, color:"#aaa", marginTop:4 }}>
+                    {selecionada.idioma} · {selecionada.tipo} · {selecionada.cidade}/{selecionada.uf}
+                  </div>
+                  {selecionada.cnpj && <div style={{ fontSize:11, color:"#666", marginTop:2 }}>CNPJ: {selecionada.cnpj}</div>}
+                </div>
+                <button onClick={() => setSelecionada(null)} style={{ background:"none", border:"none", color:"#aaa", fontSize:20, cursor:"pointer" }}>×</button>
+              </div>
+              {/* Links por envio */}
+              <div style={{ marginTop:14, display:"flex", gap:8, flexWrap:"wrap" }}>
+                {[1,2,3].map(n => (
+                  <button key={n} onClick={() => copiarLink(n)}
+                    style={{ background:"#39DF18", color:"#000", border:"none", borderRadius:4, padding:"6px 14px", fontSize:11, fontWeight:700, fontFamily:font, cursor:"pointer" }}>
+                    📋 Copiar Link {n}º Envio
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Seletor de envio */}
+            <div style={{ padding:"12px 20px", background:"#f9f9f9", borderBottom:"1px solid #eee", display:"flex", gap:8, alignItems:"center" }}>
+              <span style={{ fontSize:11, fontWeight:700, color:"#555", textTransform:"uppercase" }}>Ver projetos do:</span>
+              {[1,2,3].map(n => (
+                <button key={n} onClick={() => setEnvioVer(n)}
+                  style={{ ...( envioVer===n ? { background:"#111", color:"#fff" } : { background:"#fff", color:"#333", border:"1px solid #ddd" }), borderRadius:4, padding:"5px 14px", fontSize:12, fontWeight:700, fontFamily:font, cursor:"pointer", border: envioVer===n?"none":"1px solid #ddd" }}>
+                  {n}º Envio
+                </button>
+              ))}
+            </div>
+
+            {/* Tabela de projetos */}
+            <div style={{ overflowX:"auto", maxHeight:380, overflowY:"auto" }}>
+              {loadingProj ? (
+                <div style={{ padding:24, textAlign:"center", color:"#aaa" }}>Carregando projetos...</div>
+              ) : (
+                <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+                  <thead>
+                    <tr style={{ background:"#f5f5f5" }}>
+                      <th style={{ padding:"8px 16px", textAlign:"left", fontSize:10, fontWeight:700, color:"#888", textTransform:"uppercase" }}>Série</th>
+                      <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, fontWeight:700, color:"#888", textTransform:"uppercase" }}>1º Envio</th>
+                      <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, fontWeight:700, color:"#888", textTransform:"uppercase" }}>2º Envio</th>
+                      <th style={{ padding:"8px 12px", textAlign:"left", fontSize:10, fontWeight:700, color:"#888", textTransform:"uppercase" }}>3º Envio</th>
+                      <th style={{ width:60 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projetos.map((p, i) => (
+                      <ProjRow key={p.id||i} proj={p} destaque={envioVer} onSave={salvarProjeto} onRemove={() => removerSerie(p.id)} salvando={salvando}/>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Adicionar nova série */}
+            <div style={{ padding:"16px 20px", borderTop:"2px solid #f0f0f0", background:"#fafafa" }}>
+              <div style={{ fontSize:11, fontWeight:700, color:"#555", textTransform:"uppercase", marginBottom:10 }}>Adicionar Série</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr auto", gap:8 }}>
+                <input value={novoProj.serie} onChange={e => setNovoProj({...novoProj,serie:e.target.value})} placeholder="Série (ex: 1º ano)"
+                  style={{ padding:"8px 10px", border:"1.5px solid #ddd", borderRadius:4, fontSize:12, fontFamily:font }}/>
+                <input value={novoProj.envio_1} onChange={e => setNovoProj({...novoProj,envio_1:e.target.value})} placeholder="Projeto 1º envio"
+                  style={{ padding:"8px 10px", border:"1.5px solid #ddd", borderRadius:4, fontSize:12, fontFamily:font }}/>
+                <input value={novoProj.envio_2} onChange={e => setNovoProj({...novoProj,envio_2:e.target.value})} placeholder="Projeto 2º envio"
+                  style={{ padding:"8px 10px", border:"1.5px solid #ddd", borderRadius:4, fontSize:12, fontFamily:font }}/>
+                <input value={novoProj.envio_3} onChange={e => setNovoProj({...novoProj,envio_3:e.target.value})} placeholder="Projeto 3º envio"
+                  style={{ padding:"8px 10px", border:"1.5px solid #ddd", borderRadius:4, fontSize:12, fontFamily:font }}/>
+                <button onClick={adicionarSerie} disabled={!novoProj.serie.trim()}
+                  style={{ background:"#39DF18", color:"#000", border:"none", borderRadius:4, padding:"8px 14px", fontSize:12, fontWeight:700, fontFamily:font, cursor:"pointer", whiteSpace:"nowrap" }}>
+                  + Adicionar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProjRow({ proj, destaque, onSave, onRemove, salvando }) {
+  const [vals, setVals] = useState({ envio_1: proj.envio_1||"", envio_2: proj.envio_2||"", envio_3: proj.envio_3||"" });
+  const [editando, setEditando] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function salvar() {
+    await onSave({ ...proj, ...vals });
+    setEditando(false); setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  const highlight = (n) => n===destaque ? { background:"#f0fdf4", fontWeight:700 } : {};
+
+  return (
+    <tr style={{ borderBottom:"1px solid #f0f0f0" }}>
+      <td style={{ padding:"8px 16px", fontWeight:600, color:"#111" }}>{proj.serie}</td>
+      {[1,2,3].map(n => {
+        const key = `envio_${n}`;
+        return (
+          <td key={n} style={{ padding:"6px 8px", ...highlight(n) }}>
+            {editando
+              ? <input value={vals[key]} onChange={e => setVals({...vals,[key]:e.target.value})}
+                  style={{ width:"100%", padding:"5px 8px", border:"1.5px solid #39DF18", borderRadius:3, fontSize:11, fontFamily:font }}/>
+              : <span style={{ fontSize:12, color: vals[key] ? "#111" : "#ccc" }}>{vals[key]||"—"}</span>}
+          </td>
+        );
+      })}
+      <td style={{ padding:"6px 8px", textAlign:"right", whiteSpace:"nowrap" }}>
+        {editando ? (
+          <div style={{ display:"flex", gap:4 }}>
+            <button onClick={salvar} disabled={salvando} style={{ background:"#39DF18", border:"none", borderRadius:3, padding:"4px 10px", fontSize:11, fontWeight:700, cursor:"pointer" }}>✓</button>
+            <button onClick={() => setEditando(false)} style={{ background:"#eee", border:"none", borderRadius:3, padding:"4px 8px", fontSize:11, cursor:"pointer" }}>✕</button>
+          </div>
+        ) : (
+          <div style={{ display:"flex", gap:4 }}>
+            {saved && <span style={{ fontSize:10, color:"#39DF18", fontWeight:700, alignSelf:"center" }}>✓</span>}
+            <button onClick={() => setEditando(true)} style={{ background:"#111", border:"none", borderRadius:3, padding:"4px 10px", fontSize:11, fontWeight:700, color:"#fff", cursor:"pointer" }}>✏</button>
+            <button onClick={onRemove} style={{ background:"none", border:"1px solid #fcc", borderRadius:3, padding:"4px 8px", fontSize:11, color:"#c00", cursor:"pointer" }}>×</button>
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 function InspiramakerDashboard({ onVoltar }) {
   const [dados, setDados]       = useState([]);
   const [loading, setLoading]   = useState(true);
@@ -1797,6 +2029,12 @@ export default function Dashboard() {
             Projecao de Material
           </button>
           {isAdmin && (
+            <button onClick={() => setView(view === "baseescolas" ? "dashboard" : "baseescolas")}
+              style={{ background: view === "baseescolas" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+              Base Escolas
+            </button>
+          )}
+          {isAdmin && (
             <button onClick={() => setModalCiclo(true)}
               style={{ background: "#e53935", color: "#fff", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
               Encerrar Ciclo
@@ -1824,6 +2062,10 @@ export default function Dashboard() {
 
       {view === "inspiramaker" && (
         <InspiramakerDashboard onVoltar={() => setView("dashboard")} />
+      )}
+
+      {view === "baseescolas" && (
+        <BaseEscolasDashboard onVoltar={() => setView("dashboard")} />
       )}
 
       {view === "projecao" && (
