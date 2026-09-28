@@ -305,7 +305,7 @@ export default function BaseEscolas({ onVoltar }) {
   const [tab, setTab]             = useState("cad");
   const [modal, setModal]         = useState(null); // { title, fields, values, section }
   const [confirm, setConfirm]     = useState(null);
-  const [salvando, setSalvando]   = useState(false);
+  const [, setSalvando]   = useState(false);
   const [novaModal, setNovaModal] = useState(false);
 
   const carregar = useCallback(async () => {
