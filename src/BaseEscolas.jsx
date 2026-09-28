@@ -159,6 +159,121 @@ function Field({ label, value }) {
   );
 }
 
+// ── Alunado tab (dados ao vivo) ───────────────────────────────────
+function serieParaChave(serie) {
+  const s = (serie||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
+  if (/infant|^ei$|ed.*infant|^g\d/.test(s)) return "ei";
+  if (/^1[º°o]?\s*(ano|serie)|^primeiro/.test(s)) return "s1";
+  if (/^2[º°o]?\s*(ano|serie)|^segundo/.test(s)) return "s2";
+  if (/^3[º°o]?\s*(ano|serie)|^terceiro/.test(s)) return "s3";
+  if (/^4[º°o]?\s*(ano|serie)|^quarto/.test(s)) return "s4";
+  if (/^5[º°o]?\s*(ano|serie)|^quinto/.test(s)) return "s5";
+  if (/^6[º°o]?\s*(ano|serie)|^sexto/.test(s)) return "s6";
+  if (/^7[º°o]?\s*(ano|serie)|^setimo/.test(s)) return "s7";
+  if (/^8[º°o]?\s*(ano|serie)|^oitavo/.test(s)) return "s8";
+  if (/^9[º°o]?\s*(ano|serie)|^nono/.test(s)) return "s9";
+  if (/^1[º°o]?\s*(em|serie.*med|medio)/.test(s)) return "em1";
+  if (/^2[º°o]?\s*(em|serie.*med|medio)/.test(s)) return "em2";
+  if (/^3[º°o]?\s*(em|serie.*med|medio)/.test(s)) return "em3";
+  return null;
+}
+
+function AlunadoTab({ escola, supabaseClient, onEditContrato, onEditMatriz }) {
+  const [liveData, setLiveData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!escola) return;
+    setLoading(true);
+    (async () => {
+      // 1. Busca schools vinculadas
+      const { data: schools } = await supabaseClient
+        .from("schools").select("id").eq("escola_base_id", escola.id);
+      const ids = (schools||[]).map(s=>s.id);
+      if (!ids.length) { setLiveData({}); setLoading(false); return; }
+
+      // 2. grade_classes + classes
+      const [{ data: gcs }, { data: cls }] = await Promise.all([
+        supabaseClient.from("grade_classes").select("id, serie").in("school_id", ids),
+        supabaseClient.from("classes").select("grade_class_id, num_alunos").in("school_id", ids),
+      ]);
+
+      // 3. Agrupa num_alunos por grade_class_id
+      const alunosPorGC = {};
+      (cls||[]).forEach(c => { alunosPorGC[c.grade_class_id] = (alunosPorGC[c.grade_class_id]||0) + (c.num_alunos||0); });
+
+      // 4. Soma por chave de série
+      const porChave = {};
+      (gcs||[]).forEach(gc => {
+        const chave = serieParaChave(gc.serie);
+        if (chave) porChave[chave] = (porChave[chave]||0) + (alunosPorGC[gc.id]||0);
+      });
+      setLiveData(porChave);
+      setLoading(false);
+    })();
+  }, [escola, supabaseClient]);
+
+  const series = liveData || {};
+  const matriz = escola.seriesMatriz || {};
+  const total = SERIES_KEYS.filter(k=>!["em1","em2","em3"].includes(k)).reduce((a,k)=>a+(series[k]||0),0);
+  const totalComEM = SERIES_KEYS.reduce((a,k)=>a+(series[k]||0),0);
+  const diff = totalComEM - (Number(escola.contratoAlunado)||0);
+  const seriesComDados = SERIES_KEYS.filter(k=>(series[k]||0)>0||(matriz[k]!=null&&matriz[k]!==""));
+
+  if (loading) return <div style={{ color:"#aaa",padding:20 }}>Carregando...</div>;
+
+  return (
+    <div>
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:20 }}>
+        {[
+          {label:"EI ao 9º", value:total},
+          {label:"Com Ensino Médio", value:totalComEM},
+          {label:"Contrato", value:escola.contratoAlunado||"—"},
+          {label:"Diferença", value:diff>0?"+"+diff:diff, destaque:diff!==0},
+        ].map(st=>(
+          <div key={st.label} style={{ background:"#F1F2F2",borderRadius:6,padding:"14px 16px" }}>
+            <b style={{ fontSize:26,fontWeight:800,fontFamily:font,display:"block",color:st.destaque?"#D81E27":"#231F20" }}>{st.value}</b>
+            <span style={{ fontSize:13,color:"#6D6E71",fontFamily:fontB }}>{st.label}</span>
+          </div>
+        ))}
+      </div>
+      {seriesComDados.length === 0 && !loading && (
+        <div style={{ color:"#aaa",fontSize:13,marginBottom:12 }}>Nenhuma turma cadastrada vinculada a esta escola.</div>
+      )}
+      {seriesComDados.length > 0 && (
+        <div style={{ overflowX:"auto",border:"1px solid #DCDDDE",borderRadius:6,marginBottom:12 }}>
+          <table style={{ width:"100%",borderCollapse:"collapse",fontSize:14 }}>
+            <thead>
+              <tr style={{ background:"#F1F2F2" }}>
+                {["Série","Alunos","Matriz"].map(h=>(
+                  <th key={h} style={{ padding:"8px 12px",textAlign:h==="Série"?"left":"right",fontSize:11,fontWeight:700,fontFamily:font,letterSpacing:".05em",textTransform:"uppercase",color:"#6D6E71" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {seriesComDados.map(k=>(
+                <tr key={k} style={{ borderTop:"1px solid #DCDDDE" }}>
+                  <td style={{ padding:"8px 12px",fontWeight:600 }}>{SERIES_LABEL[k]}</td>
+                  <td style={{ padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums" }}>{series[k]||"—"}</td>
+                  <td style={{ padding:"8px 12px",textAlign:"right",color:"#6D6E71",fontVariantNumeric:"tabular-nums" }}>{matriz[k]??""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div style={{ display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap" }}>
+        <button onClick={onEditMatriz} style={{ background:"none",border:"2px solid #DCDDDE",borderRadius:6,padding:"6px 14px",fontSize:13,fontWeight:700,fontFamily:font,cursor:"pointer" }}>
+          Editar Matriz
+        </button>
+        <button onClick={onEditContrato} style={{ background:"none",border:"2px solid #DCDDDE",borderRadius:6,padding:"6px 14px",fontSize:13,fontWeight:700,fontFamily:font,cursor:"pointer" }}>
+          Editar Contrato
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Projetos / Links tab ─────────────────────────────────────────
 function ProjetosTab({ escola, supabaseClient }) {
   const [projetos, setProjetos] = useState([]);
@@ -438,58 +553,6 @@ export default function BaseEscolas({ onVoltar }) {
     );
   }
 
-  function renderAlunado(s) {
-    const series = s.series||{};
-    const total = SERIES_KEYS.filter(k=>!["em1","em2","em3"].includes(k)).reduce((a,k)=>a+(Number(series[k])||0),0);
-    const totalComEM = SERIES_KEYS.reduce((a,k)=>a+(Number(series[k])||0),0);
-    const diff = totalComEM-(Number(s.contratoAlunado)||0);
-    return (
-      <div>
-        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:20 }}>
-          {[
-            {label:"EI ao 9º",value:total,ok:null},
-            {label:"Com Ensino Médio",value:totalComEM,ok:null},
-            {label:"Contrato",value:s.contratoAlunado||"—",ok:null},
-            {label:"Diferença",value:diff>0?"+"+diff:diff,ok:diff===0},
-          ].map(st=>(
-            <div key={st.label} style={{ background:"#F1F2F2",borderRadius:6,padding:"14px 16px" }}>
-              <b style={{ fontSize:26,fontWeight:800,fontFamily:font,display:"block",color:st.ok===false&&diff!==0?"#D81E27":st.ok?"#148A00":"#231F20" }}>{st.value}</b>
-              <span style={{ fontSize:13,color:"#6D6E71",fontFamily:fontB }}>{st.label}</span>
-            </div>
-          ))}
-        </div>
-        <div style={{ overflowX:"auto",border:"1px solid #DCDDDE",borderRadius:6 }}>
-          <table style={{ width:"100%",borderCollapse:"collapse",fontSize:14 }}>
-            <thead>
-              <tr style={{ background:"#F1F2F2" }}>
-                <th style={{ padding:"8px 12px",textAlign:"left",fontSize:11,fontWeight:700,fontFamily:font,letterSpacing:".05em",textTransform:"uppercase",color:"#6D6E71" }}>Série</th>
-                <th style={{ padding:"8px 12px",textAlign:"right",fontSize:11,fontWeight:700,fontFamily:font,letterSpacing:".05em",textTransform:"uppercase",color:"#6D6E71" }}>Alunos</th>
-                <th style={{ padding:"8px 12px",textAlign:"right",fontSize:11,fontWeight:700,fontFamily:font,letterSpacing:".05em",textTransform:"uppercase",color:"#6D6E71" }}>Matriz</th>
-              </tr>
-            </thead>
-            <tbody>
-              {SERIES_KEYS.filter(k=>(series[k]!=null&&series[k]!==0)||(s.seriesMatriz?.[k]!=null&&s.seriesMatriz?.[k]!==0)).map(k=>(
-                <tr key={k} style={{ borderTop:"1px solid #DCDDDE" }}>
-                  <td style={{ padding:"8px 12px",fontWeight:600 }}>{SERIES_LABEL[k]}</td>
-                  <td style={{ padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums" }}>{series[k]??"—"}</td>
-                  <td style={{ padding:"8px 12px",textAlign:"right",color:"#6D6E71",fontVariantNumeric:"tabular-nums" }}>{s.seriesMatriz?.[k]??""}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div style={{ marginTop:12,textAlign:"right" }}>
-          <button onClick={()=>{
-            const fields=SERIES_KEYS.map(k=>({key:k,label:SERIES_LABEL[k],type:"number"}));
-            setModal({title:"Alunado por série",fields,values:series,section:"series"});
-          }} style={{ background:"none",border:"2px solid #DCDDDE",borderRadius:6,padding:"6px 14px",fontSize:13,fontWeight:700,fontFamily:font,cursor:"pointer" }}>
-            Editar alunado por série
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   function renderPendencias(s) {
     const pends = pendencias(s);
     const divs = s.divergencias||[];
@@ -569,10 +632,10 @@ export default function BaseEscolas({ onVoltar }) {
       const arr=[...(sel[section]||[])];
       arr[listEdit]=form;
       await save(sel.id,{[section]:arr});
-    } else if (section==="series") {
+    } else if (section==="series" || section==="seriesMatriz") {
       const cleaned={};
       Object.entries(form).forEach(([k,v])=>{ if(v!=="") cleaned[k]=Number(v)||0; });
-      await save(sel.id,{series:cleaned});
+      await save(sel.id,{[section]:cleaned});
     } else {
       await save(sel.id,form);
     }
@@ -710,7 +773,17 @@ export default function BaseEscolas({ onVoltar }) {
             {/* Conteúdo da tab */}
             <div style={{ padding:"22px 26px 30px" }}>
               {tab==="cad" && renderCadastro(sel)}
-              {tab==="alu" && renderAlunado(sel)}
+              {tab==="alu" && <AlunadoTab
+                escola={sel}
+                supabaseClient={supabase}
+                onEditMatriz={()=>{
+                  const fields=SERIES_KEYS.map(k=>({key:k,label:SERIES_LABEL[k],type:"number"}));
+                  setModal({title:"Matriz por série",fields,values:sel.seriesMatriz||{},section:"seriesMatriz"});
+                }}
+                onEditContrato={()=>{
+                  setModal({title:"Contrato",fields:[{key:"contratoAlunado",label:"Contrato (alunos)",type:"number"},{key:"validade",label:"Validade",type:"date"}],values:{contratoAlunado:sel.contratoAlunado||"",validade:sel.validade||""},section:"contrato"});
+                }}
+              />}
               {tab==="cont" && renderListTab("contatos",sel)}
               {tab==="form" && renderListTab("formacao",sel)}
               {tab==="obs" && renderListTab("observacoes",sel)}
