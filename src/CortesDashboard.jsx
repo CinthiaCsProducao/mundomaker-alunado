@@ -185,6 +185,129 @@ export default function CortesDashboard({ onVoltar }) {
     setSalvando(s => ({ ...s, [projeto]: false }));
   }
 
+  function exportarExcel() {
+    const headers = ["Projeto"];
+    BLOCOS.forEach(b => {
+      headers.push(`Qtd ${b.label}`);
+      CAMPOS.forEach(c => headers.push(`${c.label} (${b.label})`));
+      headers.push(`Custo Total ${b.label} (R$)`);
+    });
+    headers.push("Custo Total Geral (R$)");
+
+    const linhas = [headers.join(";")];
+    projetos.forEach(proj => {
+      const row = rows[proj] || {};
+      const linha = [`"${proj}"`];
+      BLOCOS.forEach(b => {
+        linha.push(row[`qtd_${b.key}`] ?? "");
+        CAMPOS.forEach(c => {
+          const v = row[`${c.key}_${b.key}`];
+          linha.push(v != null ? String(v).replace(".", ",") : "");
+        });
+        const tot = total(row, b.key);
+        linha.push(tot > 0 ? String(tot.toFixed(2)).replace(".", ",") : "");
+      });
+      const geral = total(row, "base") + total(row, "comp") + total(row, "prof");
+      linha.push(geral > 0 ? String(geral.toFixed(2)).replace(".", ",") : "");
+      linhas.push(linha.join(";"));
+    });
+
+    // Linha de totais
+    const totLinha = [`"TOTAL"`];
+    BLOCOS.forEach(b => {
+      totLinha.push(""); // qtd sem total
+      CAMPOS.forEach(() => totLinha.push(""));
+      totLinha.push(String(totBloco[b.key].toFixed(2)).replace(".", ","));
+    });
+    totLinha.push(String(totGeral.toFixed(2)).replace(".", ","));
+    linhas.push(totLinha.join(";"));
+
+    const bom  = "﻿";
+    const blob = new Blob([bom + linhas.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `conferencia_cortes_envio${envio}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportarPDF() {
+    const thCell = (txt, bg = "#111", color = "#fff", align = "center") =>
+      `<th style="padding:6px 10px;background:${bg};color:${color};border:1px solid #333;text-align:${align};white-space:nowrap;">${txt}</th>`;
+    const tdCell = (txt, bold = false, align = "right", bg = "#fff") =>
+      `<td style="padding:5px 10px;border:1px solid #ddd;text-align:${align};font-weight:${bold ? 700 : 400};background:${bg};">${txt ?? "—"}</td>`;
+
+    const blocoColors = { base: "#d9f0c8", comp: "#c8e0f0", prof: "#f0e8c8" };
+
+    let thead = `<tr>${thCell("Projeto", "#231F20", "#fff", "left")}`;
+    BLOCOS.forEach(b => {
+      thead += `<th colspan="${CAMPOS.length + 2}" style="padding:6px 10px;background:${blocoColors[b.key]};color:#111;border:1px solid #ccc;text-align:center;">${b.label}</th>`;
+    });
+    thead += `${thCell("Total Geral")}</tr><tr><td></td>`;
+    BLOCOS.forEach(b => {
+      thead += thCell("Qtd", blocoColors[b.key], "#333");
+      CAMPOS.forEach(c => thead += thCell(c.label, blocoColors[b.key], "#333"));
+      thead += thCell("Custo Total", "#b8d4a0", "#111");
+    });
+    thead += thCell("—", "#888"); // placeholder do total geral na 2ª linha header
+    thead += "</tr>";
+
+    let tbody = "";
+    projetos.forEach((proj, i) => {
+      const row  = rows[proj] || {};
+      const bg   = i % 2 === 0 ? "#fff" : "#f9f9f9";
+      const geralProj = total(row, "base") + total(row, "comp") + total(row, "prof");
+      let tr = `<tr style="background:${bg};">${tdCell(proj, true, "left", bg)}`;
+      BLOCOS.forEach(b => {
+        tr += tdCell(fmtN(row[`qtd_${b.key}`]));
+        CAMPOS.forEach(c => {
+          const v = row[`${c.key}_${b.key}`];
+          tr += tdCell(v != null ? (c.key === "preco_silk" || c.key === "custo" ? "R$ " + fmt(v) : fmtN(v)) : "—");
+        });
+        const tot = total(row, b.key);
+        tr += tdCell(tot > 0 ? "R$ " + fmt(tot) : "—", true, "right", blocoColors[b.key] + "55");
+      });
+      tr += tdCell(geralProj > 0 ? "R$ " + fmt(geralProj) : "—", true, "right", "#f5f5f5");
+      tr += "</tr>";
+      tbody += tr;
+    });
+
+    // Linha de totais
+    let tfoot = `<tr style="background:#ececec;font-weight:800;"><td style="padding:6px 10px;border:1px solid #ddd;font-weight:800;">TOTAL</td>`;
+    BLOCOS.forEach(b => {
+      tfoot += `<td colspan="${CAMPOS.length + 1}" style="border:1px solid #ddd;"></td>`;
+      tfoot += tdCell("R$ " + fmt(totBloco[b.key]), true, "right", blocoColors[b.key]);
+    });
+    tfoot += tdCell("R$ " + fmt(totGeral), true, "right", "#231F20");
+    tfoot += "</tr>";
+
+    const win = window.open("", "_blank");
+    win.document.write(`<!DOCTYPE html><html><head>
+      <meta charset="UTF-8">
+      <title>Conferência de Cortes — ${envio}º Envio</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; font-size: 11px; color: #111; padding: 16px; }
+        h1 { font-size: 14px; margin-bottom: 4px; }
+        p  { font-size: 10px; color: #888; margin-bottom: 12px; }
+        table { border-collapse: collapse; width: 100%; font-size: 10px; }
+        .print-btn { background: #39DF18; border: none; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; border-radius: 4px; margin-bottom: 14px; }
+        @media print { .print-btn { display: none; } }
+      </style>
+    </head><body>
+      <button class="print-btn" onclick="window.print()">Imprimir / Salvar PDF</button>
+      <h1>Conferência de Cortes — ${envio}º Envio</h1>
+      <p>Gerado em ${new Date().toLocaleString("pt-BR")}</p>
+      <table>
+        <thead>${thead}</thead>
+        <tbody>${tbody}</tbody>
+        <tfoot>${tfoot}</tfoot>
+      </table>
+    </body></html>`);
+    win.document.close();
+  }
+
   async function calcularQuantidades() {
     setCalculando(true);
     setCalcMsg("Buscando dados do Inspiramaker...");
@@ -371,6 +494,28 @@ export default function CortesDashboard({ onVoltar }) {
               }}>
               {calculando ? "Calculando..." : "⚡ Calcular Quantidades"}
             </button>
+            <button
+              onClick={exportarExcel}
+              disabled={loading || projetos.length === 0}
+              style={{
+                padding: "8px 18px", border: "none", borderRadius: 6, fontWeight: 800,
+                fontFamily: font, fontSize: 13, cursor: "pointer",
+                background: "#1D6F42", color: "#fff", whiteSpace: "nowrap",
+                opacity: projetos.length === 0 ? 0.5 : 1,
+              }}>
+              ↓ Excel
+            </button>
+            <button
+              onClick={exportarPDF}
+              disabled={loading || projetos.length === 0}
+              style={{
+                padding: "8px 18px", border: "none", borderRadius: 6, fontWeight: 800,
+                fontFamily: font, fontSize: 13, cursor: "pointer",
+                background: "#CC3333", color: "#fff", whiteSpace: "nowrap",
+                opacity: projetos.length === 0 ? 0.5 : 1,
+              }}>
+              ↓ PDF
+            </button>
           </div>
         </div>
         {calcMsg && (
@@ -482,7 +627,9 @@ export default function CortesDashboard({ onVoltar }) {
             </div>
             <div style={{ marginTop: 8, fontSize: 11, color: "#aaa", fontFamily: font }}>
               Clique em qualquer célula para editar — salvo automaticamente ao sair do campo.
-              Use <strong style={{ color: "#FFA300" }}>⚡ Calcular Quantidades</strong> para preencher Qtd Base, Comp e Prof automaticamente com base no Inspiramaker.
+              Use <strong style={{ color: "#FFA300" }}>⚡ Calcular Quantidades</strong> para preencher as qtds automaticamente.
+              {" "}<strong style={{ color: "#1D6F42" }}>↓ Excel</strong> baixa CSV compatível com Excel.
+              {" "}<strong style={{ color: "#CC3333" }}>↓ PDF</strong> abre janela de impressão.
             </div>
           </>
         )}
