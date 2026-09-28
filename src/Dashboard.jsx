@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import BaseEscolas from "./BaseEscolas";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -2199,7 +2200,7 @@ export default function Dashboard() {
       )}
 
       {view === "baseescolas" && (
-        <BaseEscolasDashboard onVoltar={() => setView("dashboard")} />
+        <BaseEscolas onVoltar={() => setView("dashboard")} />
       )}
 
       {view === "projecao" && (
