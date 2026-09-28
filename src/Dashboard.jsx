@@ -850,6 +850,9 @@ function BaseEscolasDashboard({ onVoltar }) {
   const [salvando, setSalvando]   = useState(false);
   const [envioVer, setEnvioVer]   = useState(1);
   const [novoProj, setNovoProj]   = useState({ serie:"", envio_1:"", envio_2:"", envio_3:"" });
+  const [novaEscolaModal, setNovaEscolaModal] = useState(false);
+  const [novaEscolaForm, setNovaEscolaForm]   = useState({ nome:"", cnpj:"", cidade:"", uf:"", idioma:"Português", tipo:"MakerLab", cluster:"" });
+  const [salvandoEscola, setSalvandoEscola]   = useState(false);
 
   const BASE_URL = window.location.origin;
 
@@ -895,6 +898,48 @@ function BaseEscolasDashboard({ onVoltar }) {
     setProjetos(p => p.filter(x => x.id !== id));
   }
 
+  function gerarId(nome) {
+    return nome.toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+  }
+
+  async function excluirEscola(escola) {
+    if (!window.confirm(`Excluir "${escola.nome}" da base de escolas? Esta ação não pode ser desfeita.`)) return;
+    await supabase.from("projetos_escola").delete().eq("escola_id", escola.id);
+    await supabase.from("base_escolas").delete().eq("id", escola.id);
+    setEscolas(prev => prev.filter(e => e.id !== escola.id));
+    if (selecionada?.id === escola.id) setSelecionada(null);
+  }
+
+  async function criarNovaEscola() {
+    if (!novaEscolaForm.nome.trim()) return;
+    setSalvandoEscola(true);
+    const id = gerarId(novaEscolaForm.nome);
+    const data = {
+      id,
+      nome: novaEscolaForm.nome,
+      cnpj: novaEscolaForm.cnpj || null,
+      cidade: novaEscolaForm.cidade || null,
+      uf: novaEscolaForm.uf || null,
+      idioma: novaEscolaForm.idioma,
+      tipo: novaEscolaForm.tipo,
+      cluster: novaEscolaForm.cluster || null,
+      status: "Ativo",
+    };
+    const { error } = await supabase.from("base_escolas").insert([{ id, data }]);
+    if (!error) {
+      setEscolas(prev => [...prev, { id, ...data }].sort((a,b) => (a.nome||"").localeCompare(b.nome||"")));
+      setNovaEscolaModal(false);
+      setNovaEscolaForm({ nome:"", cnpj:"", cidade:"", uf:"", idioma:"Português", tipo:"MakerLab", cluster:"" });
+      abrirEscola({ id, ...data });
+    } else {
+      alert("Erro ao salvar: " + (error.message || JSON.stringify(error)));
+    }
+    setSalvandoEscola(false);
+  }
+
   function copiarLink(envio) {
     const url = `${BASE_URL}/formulario?escola=${selecionada.id}&envio=${envio}`;
     navigator.clipboard.writeText(url);
@@ -918,20 +963,33 @@ function BaseEscolasDashboard({ onVoltar }) {
         <div style={{ background:"#fff", borderRadius:8, boxShadow:"0 1px 4px rgba(0,0,0,0.08)", overflow:"hidden" }}>
           <div style={{ background:"#111", padding:"12px 16px" }}>
             <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar escola..."
-              style={{ width:"100%", padding:"8px 12px", borderRadius:4, border:"none", fontSize:13, fontFamily:font, boxSizing:"border-box" }}/>
+              style={{ width:"100%", padding:"8px 12px", borderRadius:4, border:"none", fontSize:13, fontFamily:font, boxSizing:"border-box", marginBottom:8 }}/>
+            <button onClick={() => setNovaEscolaModal(true)}
+              style={{ width:"100%", background:"#39DF18", color:"#000", border:"none", borderRadius:4, padding:"8px", fontSize:12, fontWeight:800, fontFamily:font, cursor:"pointer" }}>
+              + Nova Escola
+            </button>
           </div>
           <div style={{ maxHeight:600, overflowY:"auto" }}>
             {loading ? (
               <div style={{ padding:24, textAlign:"center", color:"#aaa" }}>Carregando...</div>
             ) : filtradas.map(e => (
-              <div key={e.id} onClick={() => abrirEscola(e)}
-                style={{ padding:"12px 16px", borderBottom:"1px solid #f0f0f0", cursor:"pointer", background: selecionada?.id===e.id ? "#f0fdf4" : "transparent", borderLeft: selecionada?.id===e.id ? "3px solid #39DF18" : "3px solid transparent" }}>
-                <div style={{ fontSize:13, fontWeight:700, color:"#111" }}>{e.nome}</div>
-                <div style={{ fontSize:11, color:"#888", marginTop:2, display:"flex", gap:8 }}>
-                  <span style={{ background:CLUSTER_COR[e.cluster]||"#f5f5f5", borderRadius:3, padding:"1px 6px", fontWeight:600 }}>{e.cluster}</span>
-                  <span>{e.tipo}</span>
-                  <span>{e.cidade}/{e.uf}</span>
+              <div key={e.id}
+                style={{ padding:"10px 16px", borderBottom:"1px solid #f0f0f0", background: selecionada?.id===e.id ? "#f0fdf4" : "transparent", borderLeft: selecionada?.id===e.id ? "3px solid #39DF18" : "3px solid transparent", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <div onClick={() => abrirEscola(e)} style={{ cursor:"pointer", flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:"#111" }}>{e.nome}</div>
+                  <div style={{ fontSize:11, color:"#888", marginTop:2, display:"flex", gap:8 }}>
+                    <span style={{ background:CLUSTER_COR[e.cluster]||"#f5f5f5", borderRadius:3, padding:"1px 6px", fontWeight:600 }}>{e.cluster}</span>
+                    <span>{e.tipo}</span>
+                    <span>{e.cidade}/{e.uf}</span>
+                  </div>
                 </div>
+                <button onClick={ev => { ev.stopPropagation(); excluirEscola(e); }}
+                  title="Excluir escola"
+                  style={{ background:"none", border:"none", color:"#ccc", fontSize:16, cursor:"pointer", padding:"4px 6px", borderRadius:4, flexShrink:0 }}
+                  onMouseEnter={ev => ev.currentTarget.style.color="#e53e3e"}
+                  onMouseLeave={ev => ev.currentTarget.style.color="#ccc"}>
+                  🗑
+                </button>
               </div>
             ))}
           </div>
@@ -953,7 +1011,13 @@ function BaseEscolasDashboard({ onVoltar }) {
                   </div>
                   {selecionada.cnpj && <div style={{ fontSize:11, color:"#666", marginTop:2 }}>CNPJ: {selecionada.cnpj}</div>}
                 </div>
-                <button onClick={() => setSelecionada(null)} style={{ background:"none", border:"none", color:"#aaa", fontSize:20, cursor:"pointer" }}>×</button>
+                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                  <button onClick={() => excluirEscola(selecionada)}
+                    style={{ background:"#e53e3e", color:"#fff", border:"none", borderRadius:4, padding:"5px 12px", fontSize:11, fontWeight:700, fontFamily:font, cursor:"pointer" }}>
+                    🗑 Excluir
+                  </button>
+                  <button onClick={() => setSelecionada(null)} style={{ background:"none", border:"none", color:"#aaa", fontSize:20, cursor:"pointer" }}>×</button>
+                </div>
               </div>
               {/* Links por envio */}
               <div style={{ marginTop:14, display:"flex", gap:8, flexWrap:"wrap" }}>
@@ -1022,6 +1086,76 @@ function BaseEscolasDashboard({ onVoltar }) {
           </div>
         )}
       </div>
+
+      {/* Modal Nova Escola */}
+      {novaEscolaModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:999 }}>
+          <div style={{ background:"#fff", borderRadius:10, padding:32, width:480, maxWidth:"90vw", boxShadow:"0 8px 32px rgba(0,0,0,0.2)", fontFamily:font }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+              <div style={{ fontSize:18, fontWeight:800, color:"#111" }}>Nova Escola</div>
+              <button onClick={() => setNovaEscolaModal(false)} style={{ background:"none", border:"none", fontSize:22, cursor:"pointer", color:"#888" }}>×</button>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              <div style={{ gridColumn:"1/-1" }}>
+                <label style={{ fontSize:11, fontWeight:700, color:"#555", display:"block", marginBottom:4 }}>NOME DA ESCOLA *</label>
+                <input value={novaEscolaForm.nome} onChange={e => setNovaEscolaForm({...novaEscolaForm, nome:e.target.value})}
+                  placeholder="Ex: Colégio São Paulo"
+                  style={{ width:"100%", padding:"10px 12px", border:"1.5px solid #ddd", borderRadius:6, fontSize:13, fontFamily:font, boxSizing:"border-box" }}/>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:"#555", display:"block", marginBottom:4 }}>CNPJ</label>
+                <input value={novaEscolaForm.cnpj} onChange={e => setNovaEscolaForm({...novaEscolaForm, cnpj:e.target.value})}
+                  placeholder="00.000.000/0000-00"
+                  style={{ width:"100%", padding:"10px 12px", border:"1.5px solid #ddd", borderRadius:6, fontSize:13, fontFamily:font, boxSizing:"border-box" }}/>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:"#555", display:"block", marginBottom:4 }}>CLUSTER</label>
+                <select value={novaEscolaForm.cluster} onChange={e => setNovaEscolaForm({...novaEscolaForm, cluster:e.target.value})}
+                  style={{ width:"100%", padding:"10px 12px", border:"1.5px solid #ddd", borderRadius:6, fontSize:13, fontFamily:font, boxSizing:"border-box" }}>
+                  <option value="">Sem cluster</option>
+                  <option>Diamante</option><option>Ouro</option><option>Prata</option><option>Bronze</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:"#555", display:"block", marginBottom:4 }}>CIDADE</label>
+                <input value={novaEscolaForm.cidade} onChange={e => setNovaEscolaForm({...novaEscolaForm, cidade:e.target.value})}
+                  placeholder="São Paulo"
+                  style={{ width:"100%", padding:"10px 12px", border:"1.5px solid #ddd", borderRadius:6, fontSize:13, fontFamily:font, boxSizing:"border-box" }}/>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:"#555", display:"block", marginBottom:4 }}>UF</label>
+                <input value={novaEscolaForm.uf} onChange={e => setNovaEscolaForm({...novaEscolaForm, uf:e.target.value.toUpperCase().slice(0,2)})}
+                  placeholder="SP" maxLength={2}
+                  style={{ width:"100%", padding:"10px 12px", border:"1.5px solid #ddd", borderRadius:6, fontSize:13, fontFamily:font, boxSizing:"border-box" }}/>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:"#555", display:"block", marginBottom:4 }}>IDIOMA</label>
+                <select value={novaEscolaForm.idioma} onChange={e => setNovaEscolaForm({...novaEscolaForm, idioma:e.target.value})}
+                  style={{ width:"100%", padding:"10px 12px", border:"1.5px solid #ddd", borderRadius:6, fontSize:13, fontFamily:font, boxSizing:"border-box" }}>
+                  <option>Português</option><option>Inglês</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:"#555", display:"block", marginBottom:4 }}>TIPO / PROGRAMA</label>
+                <select value={novaEscolaForm.tipo} onChange={e => setNovaEscolaForm({...novaEscolaForm, tipo:e.target.value})}
+                  style={{ width:"100%", padding:"10px 12px", border:"1.5px solid #ddd", borderRadius:6, fontSize:13, fontFamily:font, boxSizing:"border-box" }}>
+                  <option>MakerLab</option><option>MakerLab Class</option><option>MakerLab Oficina</option><option>TechLab</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ marginTop:20, display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <button onClick={() => setNovaEscolaModal(false)}
+                style={{ padding:"10px 20px", border:"1.5px solid #ddd", borderRadius:6, fontSize:13, fontFamily:font, cursor:"pointer", background:"#fff" }}>
+                Cancelar
+              </button>
+              <button onClick={criarNovaEscola} disabled={salvandoEscola || !novaEscolaForm.nome.trim()}
+                style={{ padding:"10px 24px", background:"#39DF18", border:"none", borderRadius:6, fontSize:13, fontWeight:800, fontFamily:font, cursor:"pointer" }}>
+                {salvandoEscola ? "Salvando..." : "Criar Escola"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
