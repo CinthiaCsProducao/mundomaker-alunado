@@ -471,7 +471,7 @@ export default function BaseEscolas({ onVoltar }) {
               {SERIES_KEYS.filter(k=>(series[k]!=null&&series[k]!==0)||(s.seriesMatriz?.[k]!=null&&s.seriesMatriz?.[k]!==0)).map(k=>(
                 <tr key={k} style={{ borderTop:"1px solid #DCDDDE" }}>
                   <td style={{ padding:"8px 12px",fontWeight:600 }}>{SERIES_LABEL[k]}</td>
-                  <td style={{ padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums" }}>{series[k]??—}</td>
+                  <td style={{ padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums" }}>{series[k]??"—"}</td>
                   <td style={{ padding:"8px 12px",textAlign:"right",color:"#6D6E71",fontVariantNumeric:"tabular-nums" }}>{s.seriesMatriz?.[k]??""}</td>
                 </tr>
               ))}
