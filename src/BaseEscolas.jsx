@@ -396,7 +396,7 @@ export default function BaseEscolas({ onVoltar }) {
       fields:[{key:"ciclo",label:"Ciclo"},{key:"docente",label:"Docente"},{key:"cargo",label:"Cargo"},{key:"data",label:"Data",type:"date"}],
     },
     observacoes: {
-      label:"Observações",
+      label:"Histórico",
       fields:[{key:"data",label:"Data",type:"date"},{key:"texto",label:"Texto",type:"textarea",full:true}],
     },
   };
@@ -406,7 +406,7 @@ export default function BaseEscolas({ onVoltar }) {
     {id:"alu",label:"Alunado"},
     {id:"cont",label:"Contatos"},
     {id:"form",label:"Formação"},
-    {id:"obs",label:"Observações"},
+    {id:"obs",label:"Histórico"},
     {id:"pend",label:"Pendências"},
     {id:"proj",label:"Projetos / Links"},
   ];
