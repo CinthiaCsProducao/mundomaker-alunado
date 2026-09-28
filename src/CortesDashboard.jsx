@@ -12,19 +12,77 @@ const VERDE = "#39DF18";
 const PRETO = "#231F20";
 
 const BLOCOS = [
-  { key: "base", label: "Base",          qtdKey: "qtd_base" },
-  { key: "comp", label: "Complementar",  qtdKey: "qtd_comp" },
-  { key: "prof", label: "Professor",     qtdKey: "qtd_prof" },
+  { key: "base", label: "Base"         },
+  { key: "comp", label: "Complementar" },
+  { key: "prof", label: "Professor"    },
 ];
 
 const CAMPOS = [
-  { key: "tempo",     label: "Tempo teórico (min)", w: 110 },
-  { key: "qtd_silk",  label: "Qtd Silk",            w: 80  },
-  { key: "preco_silk",label: "Preço Silk",           w: 90  },
-  { key: "custo",     label: "Custo unitário",       w: 100 },
+  { key: "tempo",      label: "Tempo teórico (min)", w: 110 },
+  { key: "qtd_silk",   label: "Qtd Silk",            w: 80  },
+  { key: "preco_silk", label: "Preço Silk",           w: 90  },
+  { key: "custo",      label: "Custo unitário",       w: 100 },
 ];
 
-const fmt = (v) => v != null && v !== "" ? Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
+// Exceções de quantidade de professor por escola (escola_base_id → regra)
+const PROF_EXCECOES = {
+  "agostiniano-mendel": { default: 2 },
+  "arqui":              { default: 2 },
+  "bis":                { s6: 2, s7: 2, s8: 2 },
+  "dominus-vivendi":    { default: 2 },
+  "lyceu":              { default: 3 },
+};
+
+function serieParaChave(serie) {
+  const s = (serie || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  if (/infant|^ei$|ed.*infant|^g\d/.test(s)) return "ei";
+  if (/^1[ºo°]?\s*(ano|serie)|^primeiro/.test(s))  return "s1";
+  if (/^2[ºo°]?\s*(ano|serie)|^segundo/.test(s))   return "s2";
+  if (/^3[ºo°]?\s*(ano|serie)|^terceiro/.test(s))  return "s3";
+  if (/^4[ºo°]?\s*(ano|serie)|^quarto/.test(s))    return "s4";
+  if (/^5[ºo°]?\s*(ano|serie)|^quinto/.test(s))    return "s5";
+  if (/^6[ºo°]?\s*(ano|serie)|^sexto/.test(s))     return "s6";
+  if (/^7[ºo°]?\s*(ano|serie)|^setimo/.test(s))    return "s7";
+  if (/^8[ºo°]?\s*(ano|serie)|^oitavo/.test(s))    return "s8";
+  if (/^9[ºo°]?\s*(ano|serie)|^nono/.test(s))      return "s9";
+  if (/^1[ºo°]?\s*(em|serie.*med|medio)/.test(s))  return "em1";
+  if (/^2[ºo°]?\s*(em|serie.*med|medio)/.test(s))  return "em2";
+  if (/^3[ºo°]?\s*(em|serie.*med|medio)/.test(s))  return "em3";
+  return null;
+}
+
+function getProfQty(escolaBaseId, serie) {
+  const exc = PROF_EXCECOES[escolaBaseId];
+  if (!exc) return 1;
+  const chave = serieParaChave(serie);
+  if (chave && exc[chave] !== undefined) return exc[chave];
+  return exc.default !== undefined ? exc.default : 1;
+}
+
+function removerAcentos(str) {
+  return (str || "").replace(/[áàãâä]/g, "a").replace(/[éèêë]/g, "e").replace(/[íìîï]/g, "i")
+    .replace(/[óòõôö]/g, "o").replace(/[úùûü]/g, "u").replace(/[ç]/g, "c")
+    .replace(/[ÁÀÃÂ]/g, "A").replace(/[ÉÈÊË]/g, "E").replace(/[ÍÌÎÏ]/g, "I")
+    .replace(/[ÓÒÕÔ]/g, "O").replace(/[ÚÙÛÜ]/g, "U").replace(/[Ç]/g, "C");
+}
+
+function calcularComplementar(projeto, base, numTurmas, numSalas) {
+  const p = removerAcentos((projeto || "").toLowerCase().trim()).replace(/[^a-z0-9 ]/g, "").trim();
+  if (p === "nascer do sol"           || p === "here comes the sun")  return numSalas || 0;
+  if (p === "nossa agua"              || p === "sustainable me")       return 1;
+  if (p === "dinossauros"             || p === "fossil hunters")       return Math.ceil(base / 5);
+  if (p === "medalhoes"               || p === "ancient civilization") return Math.ceil(base / 7);
+  if (p === "telegrafo"               || p === "can you hear me")      return numTurmas;
+  if (p === "navegadores"             || p === "sea explorers")        return 1;
+  if (p.includes("atraves da lente") || p === "light camera action")  return Math.ceil(base / 7);
+  if (p === "comunicamao"             || p === "lend a hand")          return numTurmas;
+  if (p.includes("tres porquinhos")  || p === "three maker piggies")  return numSalas || 0;
+  if (p === "locomotiva"              || p === "all aboard")           return numTurmas;
+  if (p === "enigma"                  || p === "enigmaker")            return numSalas || 0;
+  return 0;
+}
+
+const fmt  = (v) => v != null && v !== "" ? Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
 const fmtN = (v) => v != null && v !== "" ? Number(v).toLocaleString("pt-BR") : "—";
 
 function total(row, bloco) {
@@ -34,7 +92,7 @@ function total(row, bloco) {
 }
 
 function CelulaEditavel({ value, onSave, moeda }) {
-  const [val, setVal] = useState(value ?? "");
+  const [val, setVal]         = useState(value ?? "");
   const [editing, setEditing] = useState(false);
 
   useEffect(() => { if (!editing) setVal(value ?? ""); }, [value, editing]);
@@ -52,7 +110,10 @@ function CelulaEditavel({ value, onSave, moeda }) {
         value={val}
         onChange={e => setVal(e.target.value)}
         onBlur={commit}
-        onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setEditing(false); setVal(value ?? ""); } }}
+        onKeyDown={e => {
+          if (e.key === "Enter")  commit();
+          if (e.key === "Escape") { setEditing(false); setVal(value ?? ""); }
+        }}
         style={{ width: "100%", padding: "3px 6px", border: "1.5px solid " + VERDE, borderRadius: 3, fontSize: 12, fontFamily: fontB, textAlign: "right", boxSizing: "border-box" }}
       />
     );
@@ -70,16 +131,17 @@ function CelulaEditavel({ value, onSave, moeda }) {
 }
 
 export default function CortesDashboard({ onVoltar }) {
-  const [envio, setEnvio]     = useState(1);
-  const [projetos, setProjetos] = useState([]);   // lista de nomes únicos
-  const [rows, setRows]       = useState({});     // { projeto: { ...campos } }
-  const [loading, setLoading] = useState(true);
-  const [salvando, setSalvando] = useState({});
+  const [envio, setEnvio]           = useState(1);
+  const [projetos, setProjetos]     = useState([]);
+  const [rows, setRows]             = useState({});
+  const [loading, setLoading]       = useState(true);
+  const [salvando, setSalvando]     = useState({});
+  const [calculando, setCalculando] = useState(false);
+  const [calcMsg, setCalcMsg]       = useState("");
 
   const carregar = useCallback(async () => {
     setLoading(true);
 
-    // 1. Projetos únicos do envio selecionado
     const col = `envio_${envio}`;
     const { data: pe } = await supabase
       .from("projetos_escola")
@@ -90,7 +152,6 @@ export default function CortesDashboard({ onVoltar }) {
     const unicos = [...new Set((pe || []).map(r => r[col]).filter(Boolean))].sort();
     setProjetos(unicos);
 
-    // 2. Dados salvos
     const { data: cortes } = await supabase
       .from("cortes_conferencia")
       .select("*")
@@ -99,11 +160,8 @@ export default function CortesDashboard({ onVoltar }) {
     const mapa = {};
     (cortes || []).forEach(c => { mapa[c.projeto] = c; });
 
-    // Inicializa rows (combina salvos com lista de projetos)
     const inicial = {};
-    unicos.forEach(p => {
-      inicial[p] = mapa[p] || { projeto: p, envio };
-    });
+    unicos.forEach(p => { inicial[p] = mapa[p] || { projeto: p, envio }; });
     setRows(inicial);
     setLoading(false);
   }, [envio]);
@@ -112,7 +170,7 @@ export default function CortesDashboard({ onVoltar }) {
 
   async function salvarCampo(projeto, campo, valor) {
     setSalvando(s => ({ ...s, [projeto]: true }));
-    const row = rows[projeto] || { projeto, envio };
+    const row   = rows[projeto] || { projeto, envio };
     const patch = { ...row, [campo]: valor, atualizado_em: new Date().toISOString() };
 
     if (patch.id) {
@@ -125,6 +183,140 @@ export default function CortesDashboard({ onVoltar }) {
     }
     setRows(r => ({ ...r, [projeto]: patch }));
     setSalvando(s => ({ ...s, [projeto]: false }));
+  }
+
+  async function calcularQuantidades() {
+    setCalculando(true);
+    setCalcMsg("Buscando dados do Inspiramaker...");
+    try {
+      const col = `envio_${envio}`;
+
+      // 1. Todas as linhas de projetos_escola para este envio
+      const { data: allPE } = await supabase
+        .from("projetos_escola")
+        .select(`escola_id, serie, ${col}`)
+        .not(col, "is", null)
+        .neq(col, "")
+        .neq(col, "-");
+
+      if (!allPE || allPE.length === 0) {
+        setCalcMsg("Nenhum dado encontrado em projetos_escola.");
+        setCalculando(false);
+        return;
+      }
+
+      const allEscolaIds = [...new Set(allPE.map(r => r.escola_id).filter(Boolean))];
+
+      // 2. Schools linkadas (escola_base_id → school)
+      setCalcMsg("Buscando escolas no Inspiramaker...");
+      const { data: allSchools } = await supabase
+        .from("schools")
+        .select("id, escola_base_id, num_salas_maker")
+        .in("escola_base_id", allEscolaIds);
+
+      // Map: escola_base_id → school (primeira encontrada)
+      const escolaToSchool = {};
+      (allSchools || []).forEach(s => {
+        if (!escolaToSchool[s.escola_base_id]) escolaToSchool[s.escola_base_id] = s;
+      });
+
+      const allSchoolIds = Object.values(escolaToSchool).map(s => s.id);
+
+      if (allSchoolIds.length === 0) {
+        setCalcMsg("Nenhuma escola encontrada no Inspiramaker para este envio.");
+        setCalculando(false);
+        return;
+      }
+
+      // 3. grade_classes e classes em batch
+      setCalcMsg("Carregando turmas e alunos...");
+      const [{ data: allGCs }, { data: allCls }] = await Promise.all([
+        supabase.from("grade_classes").select("id, school_id, serie").in("school_id", allSchoolIds),
+        supabase.from("classes").select("grade_class_id, school_id, num_alunos").in("school_id", allSchoolIds),
+      ]);
+
+      // Maps para acesso rápido
+      const gcsBySchool = {};
+      (allGCs || []).forEach(gc => {
+        if (!gcsBySchool[gc.school_id]) gcsBySchool[gc.school_id] = [];
+        gcsBySchool[gc.school_id].push(gc);
+      });
+
+      const clsByGC = {};
+      (allCls || []).forEach(cl => {
+        if (!clsByGC[cl.grade_class_id]) clsByGC[cl.grade_class_id] = [];
+        clsByGC[cl.grade_class_id].push(cl);
+      });
+
+      // 4. Calcula por projeto
+      setCalcMsg("Calculando quantidades por projeto...");
+      const resultados = {};
+      projetos.forEach(proj => {
+        const peForProj = allPE.filter(r => r[col] === proj);
+        let totalBase = 0, totalComp = 0, totalProf = 0;
+
+        peForProj.forEach(pe => {
+          const school = escolaToSchool[pe.escola_id];
+          if (!school) return;
+
+          const chaveSerieProj = serieParaChave(pe.serie);
+          const gcs = (gcsBySchool[school.id] || []).filter(
+            gc => serieParaChave(gc.serie) === chaveSerieProj
+          );
+
+          const base = gcs.reduce((a, gc) => {
+            const cls = clsByGC[gc.id] || [];
+            return a + cls.reduce((b, c) => b + Math.ceil((c.num_alunos || 0) / 4), 0);
+          }, 0);
+
+          const numTurmas = gcs.length;
+          const numSalas  = school.num_salas_maker || 0;
+
+          totalBase += base;
+          totalComp += calcularComplementar(proj, base, numTurmas, numSalas);
+          totalProf += getProfQty(pe.escola_id, pe.serie);
+        });
+
+        resultados[proj] = { qtd_base: totalBase, qtd_comp: totalComp, qtd_prof: totalProf };
+      });
+
+      // 5. Salva no banco e atualiza estado
+      setCalcMsg("Salvando no banco de dados...");
+      const newRows = { ...rows };
+      for (const proj of projetos) {
+        const calc = resultados[proj];
+        if (!calc) continue;
+        const row   = rows[proj] || { projeto: proj, envio };
+        const patch = {
+          ...row,
+          qtd_base: calc.qtd_base,
+          qtd_comp: calc.qtd_comp,
+          qtd_prof: calc.qtd_prof,
+          atualizado_em: new Date().toISOString(),
+        };
+
+        if (patch.id) {
+          await supabase.from("cortes_conferencia").update(patch).eq("id", patch.id);
+          newRows[proj] = patch;
+        } else {
+          const { data } = await supabase.from("cortes_conferencia")
+            .upsert(
+              { projeto: proj, envio, qtd_base: calc.qtd_base, qtd_comp: calc.qtd_comp, qtd_prof: calc.qtd_prof },
+              { onConflict: "projeto,envio" }
+            )
+            .select().single();
+          newRows[proj] = { ...patch, ...(data || {}) };
+        }
+      }
+
+      setRows(newRows);
+      setCalcMsg("✓ Quantidades calculadas e salvas com sucesso!");
+      setTimeout(() => setCalcMsg(""), 4000);
+    } catch (err) {
+      console.error(err);
+      setCalcMsg("Erro: " + (err.message || "Falha no cálculo."));
+    }
+    setCalculando(false);
   }
 
   // Totais por bloco
@@ -160,15 +352,32 @@ export default function CortesDashboard({ onVoltar }) {
               <span style={{ display: "block", width: 36, height: 3, background: VERDE, borderRadius: 2, marginTop: 8 }} />
             </h1>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             {[1, 2, 3].map(n => (
               <button key={n} onClick={() => setEnvio(n)}
                 style={{ padding: "8px 22px", border: "none", borderRadius: 6, fontWeight: 800, fontFamily: font, fontSize: 13, cursor: "pointer", background: envio === n ? VERDE : "rgba(255,255,255,.12)", color: envio === n ? PRETO : "#fff" }}>
                 {n}º Envio
               </button>
             ))}
+            <button
+              onClick={calcularQuantidades}
+              disabled={calculando || loading || projetos.length === 0}
+              style={{
+                padding: "8px 20px", border: "none", borderRadius: 6, fontWeight: 800,
+                fontFamily: font, fontSize: 13, cursor: calculando ? "wait" : "pointer",
+                background: calculando ? "rgba(255,255,255,.2)" : "#FFA300",
+                color: calculando ? "#fff" : PRETO, whiteSpace: "nowrap",
+                opacity: projetos.length === 0 ? 0.5 : 1,
+              }}>
+              {calculando ? "Calculando..." : "⚡ Calcular Quantidades"}
+            </button>
           </div>
         </div>
+        {calcMsg && (
+          <div style={{ maxWidth: 1600, margin: "0 auto", paddingBottom: 10, fontSize: 12, fontFamily: font, color: calcMsg.startsWith("✓") ? VERDE : calcMsg.startsWith("Erro") ? "#FF6B6B" : "#ffcc66" }}>
+            {calcMsg}
+          </div>
+        )}
       </div>
 
       <div style={{ maxWidth: 1600, margin: "0 auto", padding: "28px clamp(12px,3vw,40px)" }}>
@@ -180,7 +389,10 @@ export default function CortesDashboard({ onVoltar }) {
           <>
             {/* Totais */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12, marginBottom: 28 }}>
-              {[...BLOCOS.map(b => ({ label: `Total ${b.label}`, valor: totBloco[b.key] })), { label: "Total Geral", valor: totGeral, destaque: true }].map(t => (
+              {[
+                ...BLOCOS.map(b => ({ label: `Total ${b.label}`, valor: totBloco[b.key] })),
+                { label: "Total Geral", valor: totGeral, destaque: true },
+              ].map(t => (
                 <div key={t.label} style={{ background: t.destaque ? PRETO : "#fff", borderRadius: 8, padding: "16px 20px", boxShadow: "0 2px 8px rgba(0,0,0,.07)", border: t.destaque ? "none" : "1px solid #e8e8e8" }}>
                   <div style={{ fontSize: 22, fontWeight: 800, fontFamily: font, color: t.destaque ? VERDE : PRETO }}>
                     R$ {t.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -219,7 +431,7 @@ export default function CortesDashboard({ onVoltar }) {
                 </thead>
                 <tbody>
                   {projetos.map((proj, i) => {
-                    const row = rows[proj] || {};
+                    const row        = rows[proj] || {};
                     const isSalvando = salvando[proj];
                     return (
                       <tr key={proj} style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
@@ -269,7 +481,8 @@ export default function CortesDashboard({ onVoltar }) {
               </table>
             </div>
             <div style={{ marginTop: 8, fontSize: 11, color: "#aaa", fontFamily: font }}>
-              Clique em qualquer célula para editar. Salvo automaticamente ao sair do campo.
+              Clique em qualquer célula para editar — salvo automaticamente ao sair do campo.
+              Use <strong style={{ color: "#FFA300" }}>⚡ Calcular Quantidades</strong> para preencher Qtd Base, Comp e Prof automaticamente com base no Inspiramaker.
             </div>
           </>
         )}
