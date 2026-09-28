@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import BaseEscolas from "./BaseEscolas";
+import GerenciarUsuarios from "./GerenciarUsuarios";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -7,11 +8,6 @@ const supabase = createClient(
   process.env.REACT_APP_SUPABASE_ANON_KEY
 );
 
-const SENHAS = {
-  "mm-admin-2026":      { equipe: "Admin", cor: "#39DF18" },
-  "mm-producao-2026":   { equipe: "Producao", cor: "#00C7F4" },
-  "mm-financeiro-2026": { equipe: "Financeiro", cor: "#FFD902" },
-};
 
 const font = "'Circular Std', 'Nunito', 'Helvetica Neue', Arial, sans-serif";
 
@@ -1567,6 +1563,7 @@ function ProjecaoMaterial({ escolas, onVoltar }) {
 export default function Dashboard() {
   const [logado, setLogado]             = useState(false);
   const [equipeLogada, setEquipeLogada] = useState(null);
+  const [email, setEmail]               = useState("");
   const [senha, setSenha]               = useState("");
   const [erroLogin, setErroLogin]       = useState("");
   const [manterLogado, setManterLogado] = useState(false);
@@ -1595,16 +1592,30 @@ export default function Dashboard() {
     }
   }, []); // eslint-disable-line
 
-  function handleLogin(e) {
+  async function handleLogin(e) {
     e.preventDefault();
-    const acesso = SENHAS[senha];
-    if (acesso) {
-      if (manterLogado) localStorage.setItem("mm_dashboard_equipe", JSON.stringify(acesso));
-      setLogado(true);
-      setEquipeLogada(acesso);
-      carregarDados();
-    } else {
-      setErroLogin("Senha incorreta.");
+    setErroLogin("");
+    try {
+      const enc  = new TextEncoder();
+      const buf  = await crypto.subtle.digest("SHA-256", enc.encode(senha));
+      const hash = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+      const { data: usuario } = await supabase
+        .from("usuarios").select("*")
+        .eq("email", email.trim().toLowerCase())
+        .eq("senha", hash)
+        .eq("ativo", true)
+        .single();
+      if (usuario) {
+        const acesso = { equipe: usuario.nome, cor: "#39DF18", permissoes: usuario.permissoes || {}, email: usuario.email };
+        if (manterLogado) localStorage.setItem("mm_dashboard_equipe", JSON.stringify(acesso));
+        setLogado(true);
+        setEquipeLogada(acesso);
+        carregarDados();
+      } else {
+        setErroLogin("E-mail ou senha incorretos.");
+      }
+    } catch {
+      setErroLogin("E-mail ou senha incorretos.");
     }
   }
 
@@ -1728,7 +1739,8 @@ export default function Dashboard() {
     alunos: escolas.filter(e => e.cluster === c).reduce((a, e) => a + e.total_alunos, 0),
   }));
 
-  const isAdmin = equipeLogada?.equipe === "Admin";
+  const perm    = equipeLogada?.permissoes || {};
+  const isAdmin = perm.admin === true;
 
   if (!logado) return (
     <div style={{ minHeight: "100vh", background: "#39DF18", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font }}>
@@ -1744,6 +1756,12 @@ export default function Dashboard() {
               {erroLogin}
             </div>
           )}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 6 }}>E-mail</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="seu@email.com"
+              style={{ width: "100%", padding: "11px 14px", border: "1.5px solid #ddd", borderRadius: 4, fontSize: 14, fontFamily: font, boxSizing: "border-box" }} />
+          </div>
           <div style={{ marginBottom: 16 }}>
             <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 6 }}>Senha</label>
             <input type="password" value={senha} onChange={e => setSenha(e.target.value)}
@@ -1780,28 +1798,40 @@ export default function Dashboard() {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <button onClick={() => setView(view === "historico" ? "dashboard" : "historico")}
-            style={{ background: view === "historico" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-            Historico de Ciclos {ciclosHist.length > 0 && `(${ciclosHist.length})`}
-          </button>
-          <button onClick={() => setView(view === "escolas" ? "dashboard" : "escolas")}
-            style={{ background: view === "escolas" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-            Escolas
-          </button>
-          {(isAdmin || equipeLogada?.equipe === "Producao") && (
+          {perm.historico && (
+            <button onClick={() => setView(view === "historico" ? "dashboard" : "historico")}
+              style={{ background: view === "historico" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+              Historico de Ciclos {ciclosHist.length > 0 && `(${ciclosHist.length})`}
+            </button>
+          )}
+          {perm.escolas && (
+            <button onClick={() => setView(view === "escolas" ? "dashboard" : "escolas")}
+              style={{ background: view === "escolas" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+              Escolas
+            </button>
+          )}
+          {perm.inspiramaker && (
             <button onClick={() => setView(view === "inspiramaker" ? "dashboard" : "inspiramaker")}
               style={{ background: view === "inspiramaker" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
               Inspiramaker
             </button>
           )}
-          <button onClick={() => setView(view === "projecao" ? "dashboard" : "projecao")}
-            style={{ background: view === "projecao" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-            Projecao de Material
-          </button>
-          {isAdmin && (
+          {perm.projecao && (
+            <button onClick={() => setView(view === "projecao" ? "dashboard" : "projecao")}
+              style={{ background: view === "projecao" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+              Projecao de Material
+            </button>
+          )}
+          {perm.baseEscolas && (
             <button onClick={() => setView(view === "baseescolas" ? "dashboard" : "baseescolas")}
               style={{ background: view === "baseescolas" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
               Base Escolas
+            </button>
+          )}
+          {isAdmin && (
+            <button onClick={() => setView(view === "usuarios" ? "dashboard" : "usuarios")}
+              style={{ background: view === "usuarios" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+              Usuários
             </button>
           )}
           {isAdmin && (
@@ -1836,6 +1866,10 @@ export default function Dashboard() {
 
       {view === "baseescolas" && (
         <BaseEscolas onVoltar={() => setView("dashboard")} />
+      )}
+
+      {view === "usuarios" && (
+        <GerenciarUsuarios onVoltar={() => setView("dashboard")} />
       )}
 
       {view === "projecao" && (
