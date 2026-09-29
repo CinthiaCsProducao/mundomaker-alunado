@@ -1872,7 +1872,7 @@ export default function Dashboard() {
       )}
 
       {view === "baseescolas" && (
-        <BaseEscolas onVoltar={() => setView("dashboard")} />
+        <BaseEscolas onVoltar={() => setView("dashboard")} equipeLogada={equipeLogada} />
       )}
 
       {view === "cortes" && (
