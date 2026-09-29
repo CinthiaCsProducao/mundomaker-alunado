@@ -408,14 +408,252 @@ function ProjRow({ proj, onSave, onRemove, salvando }) {
   );
 }
 
+// ── Pendências Tab ────────────────────────────────────────────────
+function PendenciasTab({ escola, onSave, autor }) {
+  const alertas  = pendencias(escola);           // auto-geradas pelo sistema
+  const manuais  = escola.pendencias_manuais || [];
+  const abertas  = manuais.filter(p => !p.concluida);
+  const concluidas = manuais.filter(p => p.concluida);
+  const divs     = escola.divergencias || [];
+
+  const [showForm, setShowForm] = useState(false);
+  const [titulo, setTitulo]     = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [prazo, setPrazo]       = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  const VERDE_L = "#39DF18";
+  const PRETO_L = "#231F20";
+
+  function fmtData(str) {
+    if (!str) return "";
+    try { return new Date(str + "T12:00:00").toLocaleDateString("pt-BR", { day:"2-digit", month:"short", year:"numeric" }); }
+    catch { return str; }
+  }
+
+  function isVencida(prazo) {
+    if (!prazo) return false;
+    return new Date(prazo + "T23:59:59") < new Date();
+  }
+
+  async function adicionar() {
+    if (!titulo.trim()) return;
+    setSalvando(true);
+    const nova = {
+      id:         Date.now().toString(),
+      titulo:     titulo.trim(),
+      descricao:  descricao.trim(),
+      prazo:      prazo || null,
+      criado_em:  new Date().toISOString(),
+      autor:      autor || "—",
+      concluida:  false,
+      concluida_em:  null,
+      concluida_por: null,
+    };
+    await onSave(escola.id, { pendencias_manuais: [...manuais, nova] });
+    setTitulo(""); setDescricao(""); setPrazo(""); setShowForm(false);
+    setSalvando(false);
+  }
+
+  async function concluir(id) {
+    const updated = manuais.map(p =>
+      p.id === id ? { ...p, concluida: true, concluida_em: new Date().toISOString(), concluida_por: autor } : p
+    );
+    await onSave(escola.id, { pendencias_manuais: updated });
+  }
+
+  async function reabrir(id) {
+    const updated = manuais.map(p =>
+      p.id === id ? { ...p, concluida: false, concluida_em: null, concluida_por: null } : p
+    );
+    await onSave(escola.id, { pendencias_manuais: updated });
+  }
+
+  async function remover(id) {
+    await onSave(escola.id, { pendencias_manuais: manuais.filter(p => p.id !== id) });
+  }
+
+  const inpStyle = { width:"100%", border:"1.5px solid #DCDDDE", borderRadius:6, padding:"9px 12px", fontSize:13, fontFamily:fontB, boxSizing:"border-box" };
+
+  return (
+    <div>
+      {/* Alertas do sistema */}
+      {alertas.length === 0 && abertas.length === 0 ? (
+        <div style={{ background:"#f0fdf4", border:"1px solid #bbf7d0", borderRadius:6, padding:16, color:"#148A00", fontWeight:700, marginBottom:20 }}>
+          ✓ Nenhuma pendência em aberto
+        </div>
+      ) : alertas.length > 0 ? (
+        <div style={{ marginBottom:20 }}>
+          {alertas.map((p, i) => (
+            <div key={i} style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:6, padding:"10px 14px", color:"#D81E27", fontWeight:600, marginBottom:8 }}>
+              ⚠ {p}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Botão nova pendência */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+        <h3 style={{ fontSize:16, fontWeight:800, fontFamily:font, textTransform:"lowercase", margin:0 }}>
+          pendências manuais {abertas.length > 0 && <span style={{ background:"#D81E27", color:"#fff", borderRadius:20, padding:"2px 8px", fontSize:12, marginLeft:6 }}>{abertas.length}</span>}
+        </h3>
+        {!showForm && (
+          <button onClick={() => setShowForm(true)}
+            style={{ background:VERDE_L, color:PRETO_L, border:"none", borderRadius:6, padding:"8px 16px", fontSize:12, fontWeight:800, fontFamily:font, cursor:"pointer" }}>
+            + Nova Pendência
+          </button>
+        )}
+      </div>
+
+      {/* Formulário */}
+      {showForm && (
+        <div style={{ background:"#fff", borderRadius:8, border:"1.5px solid #DCDDDE", padding:18, marginBottom:18 }}>
+          <div style={{ marginBottom:12 }}>
+            <label style={{ fontSize:11, fontWeight:700, fontFamily:font, textTransform:"uppercase", letterSpacing:".05em", color:"#6D6E71", display:"block", marginBottom:5 }}>Título *</label>
+            <input value={titulo} onChange={e=>setTitulo(e.target.value)} placeholder="Ex: Contrato não assinado" style={inpStyle} />
+          </div>
+          <div style={{ marginBottom:12 }}>
+            <label style={{ fontSize:11, fontWeight:700, fontFamily:font, textTransform:"uppercase", letterSpacing:".05em", color:"#6D6E71", display:"block", marginBottom:5 }}>Descrição</label>
+            <textarea value={descricao} onChange={e=>setDescricao(e.target.value)} rows={3} placeholder="Detalhes da pendência..." style={{ ...inpStyle, resize:"vertical" }} />
+          </div>
+          <div style={{ marginBottom:14 }}>
+            <label style={{ fontSize:11, fontWeight:700, fontFamily:font, textTransform:"uppercase", letterSpacing:".05em", color:"#6D6E71", display:"block", marginBottom:5 }}>Prazo (opcional)</label>
+            <input type="date" value={prazo} onChange={e=>setPrazo(e.target.value)} style={{ ...inpStyle, width:"auto" }} />
+          </div>
+          <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
+            <button onClick={() => { setShowForm(false); setTitulo(""); setDescricao(""); setPrazo(""); }}
+              style={{ background:"none", border:"1.5px solid #DCDDDE", borderRadius:6, padding:"7px 14px", fontSize:12, fontWeight:700, fontFamily:font, cursor:"pointer" }}>
+              Cancelar
+            </button>
+            <button onClick={adicionar} disabled={salvando || !titulo.trim()}
+              style={{ background:VERDE_L, color:PRETO_L, border:"none", borderRadius:6, padding:"7px 18px", fontSize:12, fontWeight:800, fontFamily:font, cursor:"pointer", opacity:!titulo.trim()?0.5:1 }}>
+              {salvando ? "Salvando..." : "Adicionar"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Abertas */}
+      {abertas.length === 0 && !showForm && (
+        <div style={{ color:"#aaa", fontSize:13, fontFamily:font, padding:"8px 0 20px" }}>Nenhuma pendência manual em aberto.</div>
+      )}
+      {abertas.map(p => (
+        <div key={p.id} style={{ background:"#fff", borderRadius:8, border:`1.5px solid ${isVencida(p.prazo)?"#fecaca":"#DCDDDE"}`, marginBottom:10, padding:0, overflow:"hidden" }}>
+          <div style={{ padding:"12px 16px", display:"flex", gap:12, alignItems:"flex-start" }}>
+            <div style={{ width:10, height:10, borderRadius:"50%", background:isVencida(p.prazo)?"#D81E27":"#FFA300", flexShrink:0, marginTop:5 }} />
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:800, fontSize:14, fontFamily:font, color:PRETO_L }}>{p.titulo}</div>
+              {p.descricao && <div style={{ fontSize:13, fontFamily:fontB, color:"#444", marginTop:4, whiteSpace:"pre-wrap" }}>{p.descricao}</div>}
+              <div style={{ display:"flex", gap:12, marginTop:8, flexWrap:"wrap" }}>
+                <span style={{ fontSize:11, color:"#888", fontFamily:font }}>Criado por <strong>{p.autor}</strong> em {fmtData(p.criado_em?.slice(0,10))}</span>
+                {p.prazo && (
+                  <span style={{ fontSize:11, fontWeight:700, fontFamily:font, color:isVencida(p.prazo)?"#D81E27":"#888" }}>
+                    {isVencida(p.prazo) ? "⚠ Vencido em " : "Prazo: "}{fmtData(p.prazo)}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+              <button onClick={() => concluir(p.id)}
+                style={{ background:VERDE_L, color:PRETO_L, border:"none", borderRadius:6, padding:"6px 14px", fontSize:12, fontWeight:800, fontFamily:font, cursor:"pointer" }}>
+                ✓ Concluir
+              </button>
+              <button onClick={() => remover(p.id)}
+                style={{ background:"none", border:"1px solid #fecaca", color:"#D81E27", borderRadius:6, padding:"6px 10px", fontSize:12, cursor:"pointer" }}>
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Histórico (concluídas) */}
+      {concluidas.length > 0 && (
+        <div style={{ marginTop:28 }}>
+          <h3 style={{ fontSize:15, fontWeight:800, fontFamily:font, textTransform:"lowercase", margin:"0 0 12px", color:"#888" }}>
+            histórico de concluídas ({concluidas.length})
+          </h3>
+          {[...concluidas].reverse().map(p => (
+            <div key={p.id} style={{ background:"#f9f9f9", borderRadius:8, border:"1px solid #e8e8e8", marginBottom:8, padding:"10px 16px", display:"flex", gap:12, alignItems:"flex-start", opacity:0.8 }}>
+              <div style={{ width:10, height:10, borderRadius:"50%", background:VERDE_L, flexShrink:0, marginTop:5 }} />
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:700, fontSize:13, fontFamily:font, color:"#555", textDecoration:"line-through" }}>{p.titulo}</div>
+                {p.descricao && <div style={{ fontSize:12, fontFamily:fontB, color:"#888", marginTop:2 }}>{p.descricao}</div>}
+                <div style={{ fontSize:11, color:"#aaa", fontFamily:font, marginTop:4 }}>
+                  Concluída por <strong style={{ color:"#666" }}>{p.concluida_por}</strong> em {fmtData(p.concluida_em?.slice(0,10))}
+                </div>
+              </div>
+              <button onClick={() => reabrir(p.id)} title="Reabrir pendência"
+                style={{ background:"none", border:"1px solid #DCDDDE", borderRadius:6, padding:"4px 10px", fontSize:11, color:"#888", cursor:"pointer", flexShrink:0 }}>
+                Reabrir
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Divergências do sistema */}
+      {divs.length > 0 && (
+        <div style={{ marginTop:28 }}>
+          <h3 style={{ fontSize:15, fontWeight:800, fontFamily:font, textTransform:"lowercase", margin:"0 0 12px" }}>divergências detectadas</h3>
+          <div style={{ overflowX:"auto", border:"1px solid #DCDDDE", borderRadius:6 }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+              <thead>
+                <tr style={{ background:"#F1F2F2" }}>
+                  {["Campo","Cadastro","Matriz","Órbita","Conferido"].map(h=>(
+                    <th key={h} style={{ padding:"7px 12px", textAlign:"left", fontSize:10, fontWeight:700, fontFamily:font, letterSpacing:".05em", textTransform:"uppercase", color:"#6D6E71" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {divs.map((d, i) => (
+                  <tr key={i} style={{ borderTop:"1px solid #DCDDDE" }}>
+                    <td style={{ padding:"7px 12px", fontWeight:600 }}>{d.campo}</td>
+                    <td style={{ padding:"7px 12px" }}>{d.cadastro||"—"}</td>
+                    <td style={{ padding:"7px 12px" }}>{d.matriz||"—"}</td>
+                    <td style={{ padding:"7px 12px" }}>{d.orbita||"—"}</td>
+                    <td style={{ padding:"7px 12px" }}>
+                      <input type="checkbox" checked={!!d.conferido} onChange={async e => {
+                        const newDivs = [...divs];
+                        newDivs[i] = { ...d, conferido: e.target.checked };
+                        await onSave(escola.id, { divergencias: newDivs });
+                      }} style={{ accentColor:VERDE_L }} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Histórico Tab ─────────────────────────────────────────────────
+async function baixarArquivo(url, nome) {
+  try {
+    const res  = await fetch(url);
+    const blob = await res.blob();
+    const a    = document.createElement("a");
+    a.href     = URL.createObjectURL(blob);
+    a.download = nome || "arquivo";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  } catch {
+    window.open(url, "_blank");
+  }
+}
+
 function HistoricoTab({ escola, supabaseClient, autor, onSave }) {
   const [texto, setTexto]       = useState("");
   const [midias, setMidias]     = useState([]); // [{file, preview, tipo}]
   const [docs, setDocs]         = useState([]); // [{file}]
   const [salvando, setSalvando] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [expandImg, setExpandImg] = useState(null);
+  const [expandImg, setExpandImg] = useState(null); // { url, nome }
   const midiaRef = useRef();
   const docRef   = useRef();
 
@@ -609,9 +847,26 @@ function HistoricoTab({ escola, supabaseClient, autor, onSave }) {
             }}>
               {post.midia.map((m, j) => (
                 m.tipo === "video"
-                  ? <video key={j} src={m.url} controls style={{ width: "100%", maxHeight: 320, objectFit: "cover", display: "block" }} />
-                  : <img key={j} src={m.url} alt={m.nome} onClick={() => setExpandImg(m.url)}
-                      style={{ width: "100%", height: post.midia.length === 1 ? 340 : 190, objectFit: "cover", cursor: "zoom-in", display: "block" }} />
+                  ? (
+                    <div key={j} style={{ position: "relative" }}>
+                      <video src={m.url} controls style={{ width: "100%", maxHeight: 320, objectFit: "cover", display: "block" }} />
+                      <button onClick={() => baixarArquivo(m.url, m.nome)}
+                        title="Baixar vídeo"
+                        style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,.6)", border: "none", borderRadius: 6, color: "#fff", fontSize: 11, fontWeight: 700, fontFamily: font, padding: "5px 10px", cursor: "pointer" }}>
+                        ↓ Baixar
+                      </button>
+                    </div>
+                  ) : (
+                    <div key={j} style={{ position: "relative", overflow: "hidden" }}>
+                      <img src={m.url} alt={m.nome} onClick={() => setExpandImg({ url: m.url, nome: m.nome })}
+                        style={{ width: "100%", height: post.midia.length === 1 ? 340 : 190, objectFit: "cover", cursor: "zoom-in", display: "block" }} />
+                      <button onClick={e => { e.stopPropagation(); baixarArquivo(m.url, m.nome); }}
+                        title="Baixar imagem"
+                        style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,.6)", border: "none", borderRadius: 6, color: "#fff", fontSize: 11, fontWeight: 700, fontFamily: font, padding: "5px 10px", cursor: "pointer" }}>
+                        ↓ Baixar
+                      </button>
+                    </div>
+                  )
               ))}
             </div>
           )}
@@ -622,12 +877,19 @@ function HistoricoTab({ escola, supabaseClient, autor, onSave }) {
               <div style={{ fontSize: 10, fontWeight: 700, fontFamily: font, textTransform: "uppercase", letterSpacing: ".05em", color: "#888", marginBottom: 8 }}>Documentos</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {post.documentos.map((d, j) => (
-                  <a key={j} href={d.url} target="_blank" rel="noopener noreferrer"
-                    style={{ display: "flex", alignItems: "center", gap: 7, background: "#F1F2F2", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontFamily: font, color: PRETO_LOCAL, textDecoration: "none", fontWeight: 600, border: "1px solid #DCDDDE" }}>
-                    <span style={{ fontSize: 16 }}>{iconeDoc(d.tipo)}</span>
-                    <span style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.nome}</span>
-                    <span style={{ fontSize: 11, color: "#888" }}>↓ abrir</span>
-                  </a>
+                  <div key={j} style={{ display: "flex", alignItems: "center", gap: 1, background: "#F1F2F2", borderRadius: 6, border: "1px solid #DCDDDE", overflow: "hidden" }}>
+                    <a href={d.url} target="_blank" rel="noopener noreferrer"
+                      style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 12px", fontSize: 12, fontFamily: font, color: PRETO_LOCAL, textDecoration: "none", fontWeight: 600 }}>
+                      <span style={{ fontSize: 16 }}>{iconeDoc(d.tipo)}</span>
+                      <span style={{ maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.nome}</span>
+                      <span style={{ fontSize: 11, color: "#888" }}>↗ abrir</span>
+                    </a>
+                    <button onClick={() => baixarArquivo(d.url, d.nome)}
+                      title="Baixar documento"
+                      style={{ background: PRETO_LOCAL, border: "none", color: VERDE_LOCAL, fontSize: 11, fontWeight: 800, fontFamily: font, padding: "8px 10px", cursor: "pointer", whiteSpace: "nowrap" }}>
+                      ↓ Baixar
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -639,11 +901,17 @@ function HistoricoTab({ escola, supabaseClient, autor, onSave }) {
       {expandImg && (
         <div onClick={() => setExpandImg(null)}
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.92)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <img src={expandImg} alt="" style={{ maxWidth: "95vw", maxHeight: "92vh", objectFit: "contain", borderRadius: 8 }} />
-          <button onClick={() => setExpandImg(null)}
-            style={{ position: "fixed", top: 16, right: 20, background: "rgba(255,255,255,.15)", border: "none", borderRadius: "50%", width: 36, height: 36, color: "#fff", fontSize: 18, cursor: "pointer", lineHeight: "36px", textAlign: "center" }}>
-            ✕
-          </button>
+          <img src={expandImg.url} alt="" style={{ maxWidth: "95vw", maxHeight: "82vh", objectFit: "contain", borderRadius: 8 }} />
+          <div style={{ position: "fixed", top: 16, right: 20, display: "flex", gap: 8 }}>
+            <button onClick={e => { e.stopPropagation(); baixarArquivo(expandImg.url, expandImg.nome); }}
+              style={{ background: VERDE_LOCAL, border: "none", borderRadius: 6, color: PRETO_LOCAL, fontSize: 12, fontWeight: 800, fontFamily: font, padding: "8px 16px", cursor: "pointer" }}>
+              ↓ Baixar
+            </button>
+            <button onClick={() => setExpandImg(null)}
+              style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: "50%", width: 36, height: 36, color: "#fff", fontSize: 18, cursor: "pointer", lineHeight: "36px", textAlign: "center" }}>
+              ✕
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -871,9 +1139,26 @@ function RubricasTab({ escola, supabaseClient, autor, onSave }) {
             }}>
               {post.midia.map((m, j) => (
                 m.tipo === "video"
-                  ? <video key={j} src={m.url} controls style={{ width:"100%", maxHeight:320, objectFit:"cover", display:"block" }} />
-                  : <img key={j} src={m.url} alt={m.nome} onClick={() => setExpandImg(m.url)}
-                      style={{ width:"100%", height:post.midia.length===1?340:190, objectFit:"cover", cursor:"zoom-in", display:"block" }} />
+                  ? (
+                    <div key={j} style={{ position:"relative" }}>
+                      <video src={m.url} controls style={{ width:"100%", maxHeight:320, objectFit:"cover", display:"block" }} />
+                      <button onClick={() => baixarArquivo(m.url, m.nome)}
+                        title="Baixar vídeo"
+                        style={{ position:"absolute", bottom:8, right:8, background:"rgba(0,0,0,.6)", border:"none", borderRadius:6, color:"#fff", fontSize:11, fontWeight:700, fontFamily:font, padding:"5px 10px", cursor:"pointer" }}>
+                        ↓ Baixar
+                      </button>
+                    </div>
+                  ) : (
+                    <div key={j} style={{ position:"relative", overflow:"hidden" }}>
+                      <img src={m.url} alt={m.nome} onClick={() => setExpandImg({ url: m.url, nome: m.nome })}
+                        style={{ width:"100%", height:post.midia.length===1?340:190, objectFit:"cover", cursor:"zoom-in", display:"block" }} />
+                      <button onClick={e => { e.stopPropagation(); baixarArquivo(m.url, m.nome); }}
+                        title="Baixar imagem"
+                        style={{ position:"absolute", bottom:8, right:8, background:"rgba(0,0,0,.6)", border:"none", borderRadius:6, color:"#fff", fontSize:11, fontWeight:700, fontFamily:font, padding:"5px 10px", cursor:"pointer" }}>
+                        ↓ Baixar
+                      </button>
+                    </div>
+                  )
               ))}
             </div>
           )}
@@ -883,12 +1168,19 @@ function RubricasTab({ escola, supabaseClient, autor, onSave }) {
               <div style={{ fontSize:10, fontWeight:700, fontFamily:font, textTransform:"uppercase", letterSpacing:".05em", color:"#888", marginBottom:8 }}>Documentos</div>
               <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
                 {post.documentos.map((d, j) => (
-                  <a key={j} href={d.url} target="_blank" rel="noopener noreferrer"
-                    style={{ display:"flex", alignItems:"center", gap:7, background:"#F1F2F2", borderRadius:6, padding:"8px 12px", fontSize:12, fontFamily:font, color:PRETO_L, textDecoration:"none", fontWeight:600, border:"1px solid #DCDDDE" }}>
-                    <span style={{ fontSize:16 }}>{iconeDoc(d.tipo)}</span>
-                    <span style={{ maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{d.nome}</span>
-                    <span style={{ fontSize:11, color:"#888" }}>↓ abrir</span>
-                  </a>
+                  <div key={j} style={{ display:"flex", alignItems:"center", gap:1, background:"#F1F2F2", borderRadius:6, border:"1px solid #DCDDDE", overflow:"hidden" }}>
+                    <a href={d.url} target="_blank" rel="noopener noreferrer"
+                      style={{ display:"flex", alignItems:"center", gap:7, padding:"8px 12px", fontSize:12, fontFamily:font, color:PRETO_L, textDecoration:"none", fontWeight:600 }}>
+                      <span style={{ fontSize:16 }}>{iconeDoc(d.tipo)}</span>
+                      <span style={{ maxWidth:150, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{d.nome}</span>
+                      <span style={{ fontSize:11, color:"#888" }}>↗ abrir</span>
+                    </a>
+                    <button onClick={() => baixarArquivo(d.url, d.nome)}
+                      title="Baixar documento"
+                      style={{ background:PRETO_L, border:"none", color:VERDE_L, fontSize:11, fontWeight:800, fontFamily:font, padding:"8px 10px", cursor:"pointer", whiteSpace:"nowrap" }}>
+                      ↓ Baixar
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -899,11 +1191,17 @@ function RubricasTab({ escola, supabaseClient, autor, onSave }) {
       {expandImg && (
         <div onClick={() => setExpandImg(null)}
           style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.92)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-          <img src={expandImg} alt="" style={{ maxWidth:"95vw", maxHeight:"92vh", objectFit:"contain", borderRadius:8 }} />
-          <button onClick={() => setExpandImg(null)}
-            style={{ position:"fixed", top:16, right:20, background:"rgba(255,255,255,.15)", border:"none", borderRadius:"50%", width:36, height:36, color:"#fff", fontSize:18, cursor:"pointer", lineHeight:"36px", textAlign:"center" }}>
-            ✕
-          </button>
+          <img src={expandImg.url} alt="" style={{ maxWidth:"95vw", maxHeight:"82vh", objectFit:"contain", borderRadius:8 }} />
+          <div style={{ position:"fixed", top:16, right:20, display:"flex", gap:8 }}>
+            <button onClick={e => { e.stopPropagation(); baixarArquivo(expandImg.url, expandImg.nome); }}
+              style={{ background:VERDE_L, border:"none", borderRadius:6, color:PRETO_L, fontSize:12, fontWeight:800, fontFamily:font, padding:"8px 16px", cursor:"pointer" }}>
+              ↓ Baixar
+            </button>
+            <button onClick={() => setExpandImg(null)}
+              style={{ background:"rgba(255,255,255,.15)", border:"none", borderRadius:"50%", width:36, height:36, color:"#fff", fontSize:18, cursor:"pointer", lineHeight:"36px", textAlign:"center" }}>
+              ✕
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -1052,54 +1350,6 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
             </dl>
           </div>
         ))}
-      </div>
-    );
-  }
-
-  function renderPendencias(s) {
-    const pends = pendencias(s);
-    const divs = s.divergencias||[];
-    return (
-      <div>
-        {pends.length===0
-          ? <div style={{ background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:6,padding:16,color:"#148A00",fontWeight:700,marginBottom:20 }}>✓ Nenhuma pendência</div>
-          : <div style={{ marginBottom:20 }}>
-              {pends.map((p,i)=><div key={i} style={{ background:"#fef2f2",border:"1px solid #fecaca",borderRadius:6,padding:"10px 14px",color:"#D81E27",fontWeight:600,marginBottom:8 }}>⚠ {p}</div>)}
-            </div>
-        }
-        {divs.length>0 && (
-          <div>
-            <h3 style={{ fontSize:18,fontWeight:800,fontFamily:font,textTransform:"lowercase",margin:"0 0 12px" }}>Divergências</h3>
-            <div style={{ overflowX:"auto",border:"1px solid #DCDDDE",borderRadius:6 }}>
-              <table style={{ width:"100%",borderCollapse:"collapse",fontSize:13 }}>
-                <thead>
-                  <tr style={{ background:"#F1F2F2" }}>
-                    {["Campo","Cadastro","Matriz","Órbita","Conferido"].map(h=>(
-                      <th key={h} style={{ padding:"7px 12px",textAlign:"left",fontSize:10,fontWeight:700,fontFamily:font,letterSpacing:".05em",textTransform:"uppercase",color:"#6D6E71" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {divs.map((d,i)=>(
-                    <tr key={i} style={{ borderTop:"1px solid #DCDDDE" }}>
-                      <td style={{ padding:"7px 12px",fontWeight:600 }}>{d.campo}</td>
-                      <td style={{ padding:"7px 12px" }}>{d.cadastro||"—"}</td>
-                      <td style={{ padding:"7px 12px" }}>{d.matriz||"—"}</td>
-                      <td style={{ padding:"7px 12px" }}>{d.orbita||"—"}</td>
-                      <td style={{ padding:"7px 12px" }}>
-                        <input type="checkbox" checked={!!d.conferido} onChange={async e=>{
-                          const newDivs=[...divs];
-                          newDivs[i]={...d,conferido:e.target.checked};
-                          await save(s.id,{divergencias:newDivs});
-                        }} style={{ accentColor:VERDE }}/>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -1290,7 +1540,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
               {tab==="cont" && renderListTab("contatos",sel)}
               {tab==="form" && renderListTab("formacao",sel)}
               {tab==="obs" && <HistoricoTab escola={sel} supabaseClient={supabase} autor={equipeLogada?.equipe || "—"} onSave={save} />}
-              {tab==="pend" && renderPendencias(sel)}
+              {tab==="pend" && <PendenciasTab escola={sel} onSave={save} autor={equipeLogada?.equipe || "—"} />}
               {tab==="proj" && <ProjetosTab escola={sel} supabaseClient={supabase}/>}
               {tab==="rubrica" && <RubricasTab escola={sel} supabaseClient={supabase} autor={equipeLogada?.equipe || "—"} onSave={save} />}
             </div>
