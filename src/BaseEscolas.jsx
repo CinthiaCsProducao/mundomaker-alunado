@@ -650,6 +650,266 @@ function HistoricoTab({ escola, supabaseClient, autor, onSave }) {
   );
 }
 
+// ── Rubricas Tab ──────────────────────────────────────────────────
+function RubricasTab({ escola, supabaseClient, autor, onSave }) {
+  const [texto, setTexto]           = useState("");
+  const [dataObs, setDataObs]       = useState(new Date().toISOString().slice(0, 10));
+  const [acompanhou, setAcompanhou] = useState("");
+  const [midias, setMidias]         = useState([]);
+  const [docs, setDocs]             = useState([]);
+  const [salvando, setSalvando]     = useState(false);
+  const [showForm, setShowForm]     = useState(false);
+  const [expandImg, setExpandImg]   = useState(null);
+  const midiaRef = useRef();
+  const docRef   = useRef();
+
+  const posts = [...(escola.rubricas || [])].sort((a, b) => {
+    const da = a.criado_em || a.dataObs || "";
+    const db = b.criado_em || b.dataObs || "";
+    return db.localeCompare(da);
+  });
+
+  function addMidia(e) {
+    Array.from(e.target.files).forEach(file => {
+      const tipo    = file.type.startsWith("video") ? "video" : "image";
+      const preview = URL.createObjectURL(file);
+      setMidias(m => [...m, { file, preview, tipo }]);
+    });
+    e.target.value = "";
+  }
+
+  function addDocs(e) {
+    setDocs(d => [...d, ...Array.from(e.target.files).map(f => ({ file: f }))]);
+    e.target.value = "";
+  }
+
+  async function uploadFile(file, pasta) {
+    const ext  = file.name.split(".").pop().toLowerCase();
+    const path = `${escola.id}/rubricas/${pasta}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error } = await supabaseClient.storage.from("historico-escola").upload(path, file);
+    if (error) throw new Error(error.message);
+    const { data: { publicUrl } } = supabaseClient.storage.from("historico-escola").getPublicUrl(path);
+    return publicUrl;
+  }
+
+  async function publicar() {
+    if (!texto.trim() && midias.length === 0 && docs.length === 0) return;
+    setSalvando(true);
+    try {
+      const midiaUp = [];
+      for (const m of midias) {
+        const url = await uploadFile(m.file, "midia");
+        midiaUp.push({ nome: m.file.name, url, tipo: m.tipo });
+      }
+      const docsUp = [];
+      for (const d of docs) {
+        const url = await uploadFile(d.file, "docs");
+        docsUp.push({ nome: d.file.name, url, tipo: d.file.name.split(".").pop().toLowerCase() });
+      }
+      const post = {
+        id:          Date.now().toString(),
+        criado_em:   new Date().toISOString(),
+        autor:       autor || "—",
+        dataObs:     dataObs,
+        acompanhou:  acompanhou.trim() || autor || "—",
+        texto:       texto.trim(),
+        midia:       midiaUp,
+        documentos:  docsUp,
+      };
+      await onSave(escola.id, { rubricas: [...(escola.rubricas || []), post] });
+      setTexto(""); setMidias([]); setDocs([]);
+      setDataObs(new Date().toISOString().slice(0, 10));
+      setAcompanhou(""); setShowForm(false);
+    } catch (err) {
+      alert("Erro ao publicar: " + (err.message || "Tente novamente."));
+    }
+    setSalvando(false);
+  }
+
+  function iconeDoc(tipo) {
+    if (tipo === "pdf") return "📄";
+    if (["doc","docx"].includes(tipo)) return "📝";
+    if (["xls","xlsx"].includes(tipo)) return "📊";
+    return "📎";
+  }
+
+  function fmtData(str) {
+    if (!str) return "";
+    try { return new Date(str + "T12:00:00").toLocaleDateString("pt-BR", { day:"2-digit", month:"long", year:"numeric" }); }
+    catch { return str; }
+  }
+
+  const VERDE_L = "#39DF18";
+  const PRETO_L = "#231F20";
+
+  const inpStyle = { width:"100%", border:"1.5px solid #DCDDDE", borderRadius:6, padding:"9px 12px", fontSize:13, fontFamily:fontB, boxSizing:"border-box" };
+
+  return (
+    <div>
+      {!showForm && (
+        <button onClick={() => setShowForm(true)}
+          style={{ background:VERDE_L, color:PRETO_L, border:"none", borderRadius:6, padding:"10px 20px", fontSize:13, fontWeight:800, fontFamily:font, cursor:"pointer", marginBottom:20 }}>
+          + Nova Observação de Aula
+        </button>
+      )}
+
+      {showForm && (
+        <div style={{ background:"#fff", borderRadius:10, border:"1.5px solid #DCDDDE", padding:20, marginBottom:20 }}>
+          {/* Campos específicos */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, fontFamily:font, textTransform:"uppercase", letterSpacing:".05em", color:"#6D6E71", display:"block", marginBottom:5 }}>
+                Data da Observação de Aula
+              </label>
+              <input type="date" value={dataObs} onChange={e=>setDataObs(e.target.value)} style={inpStyle} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, fontFamily:font, textTransform:"uppercase", letterSpacing:".05em", color:"#6D6E71", display:"block", marginBottom:5 }}>
+                Nome de quem acompanhou
+              </label>
+              <input type="text" value={acompanhou} onChange={e=>setAcompanhou(e.target.value)}
+                placeholder={autor || "Nome do acompanhante..."}
+                style={inpStyle} />
+            </div>
+          </div>
+
+          <textarea
+            value={texto}
+            onChange={e => setTexto(e.target.value)}
+            placeholder="Descreva as observações, rubricas avaliadas, pontos de atenção..."
+            rows={5}
+            style={{ ...inpStyle, resize:"vertical", display:"block" }}
+          />
+
+          {midias.length > 0 && (
+            <div style={{ display:"flex", flexWrap:"wrap", gap:8, margin:"12px 0" }}>
+              {midias.map((m, i) => (
+                <div key={i} style={{ position:"relative" }}>
+                  {m.tipo === "image"
+                    ? <img src={m.preview} alt="" style={{ width:80, height:80, objectFit:"cover", borderRadius:6 }} />
+                    : <video src={m.preview} style={{ width:120, height:80, objectFit:"cover", borderRadius:6 }} />
+                  }
+                  <button onClick={() => setMidias(mm => mm.filter((_,j)=>j!==i))}
+                    style={{ position:"absolute", top:-6, right:-6, background:"#D81E27", color:"#fff", border:"none", borderRadius:"50%", width:18, height:18, fontSize:10, cursor:"pointer", lineHeight:"18px", textAlign:"center", padding:0 }}>
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {docs.length > 0 && (
+            <div style={{ display:"flex", flexWrap:"wrap", gap:8, margin:"8px 0" }}>
+              {docs.map((d, i) => (
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:6, background:"#F1F2F2", borderRadius:4, padding:"5px 10px", fontSize:12, fontFamily:font }}>
+                  <span>{iconeDoc(d.file.name.split(".").pop().toLowerCase())}</span>
+                  <span style={{ maxWidth:130, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{d.file.name}</span>
+                  <button onClick={() => setDocs(dd => dd.filter((_,j)=>j!==i))}
+                    style={{ background:"none", border:"none", color:"#D81E27", cursor:"pointer", padding:0, fontSize:14, lineHeight:1 }}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <input ref={midiaRef} type="file" accept="image/*,video/*" multiple onChange={addMidia} style={{ display:"none" }} />
+          <input ref={docRef}   type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" multiple onChange={addDocs} style={{ display:"none" }} />
+
+          <div style={{ display:"flex", gap:8, marginTop:14, alignItems:"center", flexWrap:"wrap" }}>
+            <button onClick={() => midiaRef.current.click()}
+              style={{ background:"#F1F2F2", border:"none", borderRadius:6, padding:"8px 14px", fontSize:12, fontWeight:700, fontFamily:font, cursor:"pointer" }}>
+              📷 Foto / Vídeo
+            </button>
+            <button onClick={() => docRef.current.click()}
+              style={{ background:"#F1F2F2", border:"none", borderRadius:6, padding:"8px 14px", fontSize:12, fontWeight:700, fontFamily:font, cursor:"pointer" }}>
+              📎 Documento
+            </button>
+            <div style={{ flex:1 }} />
+            <button onClick={() => { setShowForm(false); setTexto(""); setMidias([]); setDocs([]); setAcompanhou(""); setDataObs(new Date().toISOString().slice(0,10)); }}
+              style={{ background:"none", border:"1.5px solid #DCDDDE", borderRadius:6, padding:"8px 14px", fontSize:12, fontWeight:700, fontFamily:font, cursor:"pointer" }}>
+              Cancelar
+            </button>
+            <button onClick={publicar} disabled={salvando || (!texto.trim() && midias.length===0 && docs.length===0)}
+              style={{ background:VERDE_L, color:PRETO_L, border:"none", borderRadius:6, padding:"8px 20px", fontSize:12, fontWeight:800, fontFamily:font, cursor:"pointer", opacity:(!texto.trim() && midias.length===0 && docs.length===0)?0.5:1 }}>
+              {salvando ? "Publicando..." : "Salvar Observação"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {posts.length === 0 && !showForm && (
+        <div style={{ color:"#aaa", fontSize:14, fontFamily:font, padding:"20px 0" }}>Nenhuma observação de aula registrada ainda.</div>
+      )}
+
+      {posts.map((post, i) => (
+        <div key={post.id || i} style={{ background:"#fff", borderRadius:10, border:"1px solid #DCDDDE", marginBottom:14, overflow:"hidden" }}>
+          {/* Header */}
+          <div style={{ padding:"14px 16px 10px", display:"flex", gap:10, alignItems:"flex-start", borderBottom:"1px solid #F1F2F2" }}>
+            <div style={{ width:36, height:36, borderRadius:"50%", background:"#6D6E71", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:13, fontFamily:font, color:"#fff", flexShrink:0 }}>
+              {(post.acompanhou || post.autor || "?").charAt(0).toUpperCase()}
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:800, fontSize:13, fontFamily:font }}>{post.acompanhou || post.autor || "—"}</div>
+              <div style={{ fontSize:11, color:"#888", fontFamily:font, marginTop:2 }}>Registrado por {post.autor}</div>
+            </div>
+            <div style={{ textAlign:"right" }}>
+              <div style={{ fontSize:11, fontWeight:700, fontFamily:font, color:"#555", textTransform:"uppercase", letterSpacing:".04em" }}>Observação de aula</div>
+              <div style={{ fontSize:13, fontWeight:800, fontFamily:font, color:PRETO_L, marginTop:2 }}>{fmtData(post.dataObs)}</div>
+            </div>
+          </div>
+
+          {post.texto && (
+            <div style={{ padding:"12px 16px", fontSize:14, fontFamily:fontB, color:PRETO_L, whiteSpace:"pre-wrap", lineHeight:1.55 }}>
+              {post.texto}
+            </div>
+          )}
+
+          {(post.midia || []).length > 0 && (
+            <div style={{
+              display:"grid",
+              gridTemplateColumns: post.midia.length===1 ? "1fr" : post.midia.length===2 ? "1fr 1fr" : "1fr 1fr 1fr",
+              gap:2,
+            }}>
+              {post.midia.map((m, j) => (
+                m.tipo === "video"
+                  ? <video key={j} src={m.url} controls style={{ width:"100%", maxHeight:320, objectFit:"cover", display:"block" }} />
+                  : <img key={j} src={m.url} alt={m.nome} onClick={() => setExpandImg(m.url)}
+                      style={{ width:"100%", height:post.midia.length===1?340:190, objectFit:"cover", cursor:"zoom-in", display:"block" }} />
+              ))}
+            </div>
+          )}
+
+          {(post.documentos || []).length > 0 && (
+            <div style={{ padding:"12px 16px", borderTop:(post.midia||[]).length>0?"1px solid #F1F2F2":"none" }}>
+              <div style={{ fontSize:10, fontWeight:700, fontFamily:font, textTransform:"uppercase", letterSpacing:".05em", color:"#888", marginBottom:8 }}>Documentos</div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                {post.documentos.map((d, j) => (
+                  <a key={j} href={d.url} target="_blank" rel="noopener noreferrer"
+                    style={{ display:"flex", alignItems:"center", gap:7, background:"#F1F2F2", borderRadius:6, padding:"8px 12px", fontSize:12, fontFamily:font, color:PRETO_L, textDecoration:"none", fontWeight:600, border:"1px solid #DCDDDE" }}>
+                    <span style={{ fontSize:16 }}>{iconeDoc(d.tipo)}</span>
+                    <span style={{ maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{d.nome}</span>
+                    <span style={{ fontSize:11, color:"#888" }}>↓ abrir</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {expandImg && (
+        <div onClick={() => setExpandImg(null)}
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.92)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+          <img src={expandImg} alt="" style={{ maxWidth:"95vw", maxHeight:"92vh", objectFit:"contain", borderRadius:8 }} />
+          <button onClick={() => setExpandImg(null)}
+            style={{ position:"fixed", top:16, right:20, background:"rgba(255,255,255,.15)", border:"none", borderRadius:"50%", width:36, height:36, color:"#fff", fontSize:18, cursor:"pointer", lineHeight:"36px", textAlign:"center" }}>
+            ✕
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Componente principal ─────────────────────────────────────────
 export default function BaseEscolas({ onVoltar, equipeLogada }) {
   const [escolas, setEscolas]     = useState([]);
@@ -766,6 +1026,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
     {id:"obs",label:"Histórico"},
     {id:"pend",label:"Pendências"},
     {id:"proj",label:"Projetos / Links"},
+    {id:"rubrica",label:"Acompanhamento / Rubricas"},
   ];
 
   function renderCadastro(s) {
@@ -1031,6 +1292,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
               {tab==="obs" && <HistoricoTab escola={sel} supabaseClient={supabase} autor={equipeLogada?.equipe || "—"} onSave={save} />}
               {tab==="pend" && renderPendencias(sel)}
               {tab==="proj" && <ProjetosTab escola={sel} supabaseClient={supabase}/>}
+              {tab==="rubrica" && <RubricasTab escola={sel} supabaseClient={supabase} autor={equipeLogada?.equipe || "—"} onSave={save} />}
             </div>
           </div>
         )}
