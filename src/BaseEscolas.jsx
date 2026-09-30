@@ -1208,6 +1208,251 @@ function RubricasTab({ escola, supabaseClient, autor, onSave }) {
   );
 }
 
+// ── Aba Reuniões ─────────────────────────────────────────────────
+function ReuniaoTab({ escola, autor, onSave }) {
+  const AREAS = ["Comercial","Pedagógico","Financeiro","Operacional","Diretoria","Suporte","Outra"];
+
+  const [showForm, setShowForm]     = useState(false);
+  const [salvando, setSalvando]     = useState(false);
+  const [concluindo, setConcluindo] = useState(null); // id da reunião sendo concluída
+  const [relatoFinal, setRelatoFinal] = useState("");
+  const [form, setForm] = useState({
+    data_agendada: "", tipo: "Presencial", areas: [], envolvidos: "", notas: ""
+  });
+
+  const reunioes = [...(escola.reunioes || [])].sort(
+    (a, b) => new Date(b.data_agendada) - new Date(a.data_agendada)
+  );
+  const agendadas = reunioes.filter(r => r.status === "Agendada");
+  const passadas  = reunioes.filter(r => r.status !== "Agendada");
+
+  function toggleArea(area) {
+    setForm(f => ({
+      ...f,
+      areas: f.areas.includes(area) ? f.areas.filter(a => a !== area) : [...f.areas, area]
+    }));
+  }
+
+  async function salvarReuniao() {
+    if (!form.data_agendada || !form.envolvidos.trim()) return;
+    setSalvando(true);
+    const nova = {
+      id: crypto.randomUUID(),
+      data_agendada: form.data_agendada,
+      tipo: form.tipo,
+      areas: form.areas,
+      envolvidos: form.envolvidos.trim(),
+      notas: form.notas.trim(),
+      status: "Agendada",
+      relato: "",
+      criado_em: new Date().toISOString(),
+      criado_por: autor,
+    };
+    await onSave(escola.id, { reunioes: [...(escola.reunioes || []), nova] });
+    setForm({ data_agendada: "", tipo: "Presencial", areas: [], envolvidos: "", notas: "" });
+    setShowForm(false);
+    setSalvando(false);
+  }
+
+  async function concluirReuniao(id, status) {
+    const atualizadas = (escola.reunioes || []).map(r =>
+      r.id === id
+        ? { ...r, status, relato: relatoFinal.trim(), concluida_em: new Date().toISOString(), concluida_por: autor }
+        : r
+    );
+    await onSave(escola.id, { reunioes: atualizadas });
+    setConcluindo(null);
+    setRelatoFinal("");
+  }
+
+  const inpStyle = { width:"100%", border:"1.5px solid #DCDDDE", borderRadius:6, padding:"9px 12px", fontSize:13, fontFamily:fontB, boxSizing:"border-box" };
+  const btnBase  = { border:"none", borderRadius:6, padding:"8px 16px", fontSize:12, fontWeight:700, fontFamily:fontB, cursor:"pointer" };
+
+  function CardReuniao({ r }) {
+    const dt = r.data_agendada ? new Date(r.data_agendada).toLocaleString("pt-BR", { dateStyle:"short", timeStyle:"short" }) : "—";
+    const statusColor = r.status === "Agendada" ? "#f59e0b" : r.status === "Realizada" ? "#22c55e" : "#ef4444";
+    const statusLabel = r.status === "Agendada" ? "🟡 Agendada" : r.status === "Realizada" ? "✅ Realizada" : "❌ Não aconteceu";
+
+    return (
+      <div style={{ border:"1.5px solid #e5e7eb", borderRadius:8, padding:16, marginBottom:12, background:"#fff" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:8 }}>
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+              <span style={{ fontSize:15, fontWeight:800, color:"#111" }}>{dt}</span>
+              <span style={{ fontSize:11, fontWeight:700, padding:"2px 10px", borderRadius:999,
+                background: r.tipo === "Presencial" ? "#dcfce7" : "#dbeafe",
+                color: r.tipo === "Presencial" ? "#166534" : "#1d4ed8" }}>
+                {r.tipo === "Presencial" ? "🏢 Presencial" : "💻 Online"}
+              </span>
+              <span style={{ fontSize:11, fontWeight:700, color: statusColor }}>{statusLabel}</span>
+            </div>
+            {r.areas && r.areas.length > 0 && (
+              <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginTop:6 }}>
+                {r.areas.map(a => (
+                  <span key={a} style={{ fontSize:11, background:"#f3f4f6", borderRadius:4, padding:"2px 8px", color:"#555" }}>{a}</span>
+                ))}
+              </div>
+            )}
+            <div style={{ fontSize:13, color:"#444", marginTop:6 }}>
+              <strong>Envolvidos:</strong> {r.envolvidos}
+            </div>
+            {r.notas && r.status === "Agendada" && (
+              <div style={{ fontSize:12, color:"#666", marginTop:4 }}>
+                <strong>Notas:</strong> {r.notas}
+              </div>
+            )}
+            {r.relato && (
+              <div style={{ fontSize:12, color:"#444", marginTop:6, background:"#f9fafb", borderRadius:6, padding:"8px 12px" }}>
+                <strong>Resumo:</strong> {r.relato}
+              </div>
+            )}
+            {r.concluida_em && (
+              <div style={{ fontSize:11, color:"#888", marginTop:4 }}>
+                Concluída por <strong>{r.concluida_por}</strong> em {new Date(r.concluida_em).toLocaleDateString("pt-BR")}
+              </div>
+            )}
+            <div style={{ fontSize:11, color:"#aaa", marginTop:4 }}>
+              Criada por {r.criado_por} em {r.criado_em ? new Date(r.criado_em).toLocaleDateString("pt-BR") : "—"}
+            </div>
+          </div>
+          {r.status === "Agendada" && (
+            <button onClick={() => { setConcluindo(r.id); setRelatoFinal(""); }}
+              style={{ ...btnBase, background:"#111", color:"#fff", whiteSpace:"nowrap" }}>
+              ✓ Concluir
+            </button>
+          )}
+        </div>
+
+        {/* Painel de conclusão */}
+        {concluindo === r.id && (
+          <div style={{ marginTop:14, background:"#f9fafb", borderRadius:8, padding:14, border:"1.5px solid #e5e7eb" }}>
+            <div style={{ fontSize:13, fontWeight:700, marginBottom:10, color:"#333" }}>Como foi a reunião?</div>
+            <textarea
+              value={relatoFinal} onChange={e => setRelatoFinal(e.target.value)}
+              placeholder="Resumo do que foi tratado (opcional)..."
+              rows={3}
+              style={{ ...inpStyle, resize:"vertical", marginBottom:10 }}
+            />
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={() => concluirReuniao(r.id, "Realizada")}
+                style={{ ...btnBase, background:"#22c55e", color:"#fff" }}>
+                ✅ Reunião realizada
+              </button>
+              <button onClick={() => concluirReuniao(r.id, "Não aconteceu")}
+                style={{ ...btnBase, background:"#ef4444", color:"#fff" }}>
+                ❌ Não aconteceu (no-show)
+              </button>
+              <button onClick={() => setConcluindo(null)}
+                style={{ ...btnBase, background:"#e5e7eb", color:"#555" }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ fontFamily:fontB }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <div style={{ fontSize:15, fontWeight:800, color:"#111" }}>Reuniões</div>
+        <button onClick={() => setShowForm(s => !s)}
+          style={{ ...btnBase, background: showForm ? "#e5e7eb" : VERDE, color: showForm ? "#555" : "#000" }}>
+          {showForm ? "✕ Cancelar" : "+ Nova Reunião"}
+        </button>
+      </div>
+
+      {/* Formulário nova reunião */}
+      {showForm && (
+        <div style={{ background:"#f9fafb", border:"1.5px solid #e5e7eb", borderRadius:8, padding:18, marginBottom:20 }}>
+          <div style={{ fontWeight:700, fontSize:13, marginBottom:12, color:"#333" }}>Nova Reunião</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:"#555", display:"block", marginBottom:4 }}>DATA E HORA *</label>
+              <input type="datetime-local" value={form.data_agendada}
+                onChange={e => setForm(f => ({ ...f, data_agendada: e.target.value }))}
+                style={inpStyle} />
+            </div>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:"#555", display:"block", marginBottom:4 }}>MODALIDADE</label>
+              <div style={{ display:"flex", gap:8 }}>
+                {["Presencial","Online"].map(t => (
+                  <button key={t} onClick={() => setForm(f => ({ ...f, tipo: t }))}
+                    style={{ ...btnBase, flex:1,
+                      background: form.tipo === t ? (t === "Presencial" ? "#dcfce7" : "#dbeafe") : "#e5e7eb",
+                      color: form.tipo === t ? (t === "Presencial" ? "#166534" : "#1d4ed8") : "#555",
+                      border: form.tipo === t ? `2px solid ${t === "Presencial" ? "#22c55e" : "#3b82f6"}` : "2px solid transparent" }}>
+                    {t === "Presencial" ? "🏢 Presencial" : "💻 Online"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div style={{ marginBottom:12 }}>
+            <label style={{ fontSize:11, fontWeight:700, color:"#555", display:"block", marginBottom:6 }}>ÁREA(S) DA EMPRESA</label>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+              {AREAS.map(a => (
+                <button key={a} onClick={() => toggleArea(a)}
+                  style={{ ...btnBase, padding:"5px 12px", fontSize:11,
+                    background: form.areas.includes(a) ? VERDE : "#e5e7eb",
+                    color: form.areas.includes(a) ? "#000" : "#555" }}>
+                  {a}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginBottom:12 }}>
+            <label style={{ fontSize:11, fontWeight:700, color:"#555", display:"block", marginBottom:4 }}>ENVOLVIDOS *</label>
+            <input type="text" value={form.envolvidos}
+              onChange={e => setForm(f => ({ ...f, envolvidos: e.target.value }))}
+              placeholder="Ex: João (Comercial), Maria (Pedagógico)"
+              style={inpStyle} />
+          </div>
+          <div style={{ marginBottom:14 }}>
+            <label style={{ fontSize:11, fontWeight:700, color:"#555", display:"block", marginBottom:4 }}>NOTAS PRÉ-REUNIÃO</label>
+            <textarea value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
+              placeholder="Pauta, objetivos ou informações importantes..." rows={3}
+              style={{ ...inpStyle, resize:"vertical" }} />
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={salvarReuniao} disabled={salvando || !form.data_agendada || !form.envolvidos.trim()}
+              style={{ ...btnBase, background: VERDE, color:"#000", opacity: (salvando || !form.data_agendada || !form.envolvidos.trim()) ? 0.5 : 1 }}>
+              {salvando ? "Salvando..." : "💾 Salvar Reunião"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Lista agendadas */}
+      {agendadas.length > 0 && (
+        <div style={{ marginBottom:20 }}>
+          <div style={{ fontSize:12, fontWeight:700, color:"#f59e0b", textTransform:"uppercase", letterSpacing:1, marginBottom:8 }}>
+            Próximas ({agendadas.length})
+          </div>
+          {agendadas.map(r => <CardReuniao key={r.id} r={r} />)}
+        </div>
+      )}
+
+      {/* Lista passadas */}
+      {passadas.length > 0 && (
+        <div>
+          <div style={{ fontSize:12, fontWeight:700, color:"#888", textTransform:"uppercase", letterSpacing:1, marginBottom:8 }}>
+            Histórico ({passadas.length})
+          </div>
+          {passadas.map(r => <CardReuniao key={r.id} r={r} />)}
+        </div>
+      )}
+
+      {reunioes.length === 0 && !showForm && (
+        <div style={{ textAlign:"center", color:"#aaa", padding:"40px 0", fontSize:13 }}>
+          Nenhuma reunião cadastrada ainda.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Componente principal ─────────────────────────────────────────
 export default function BaseEscolas({ onVoltar, equipeLogada }) {
   const [escolas, setEscolas]     = useState([]);
@@ -1325,6 +1570,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
     {id:"pend",label:"Pendências"},
     {id:"proj",label:"Projetos / Links"},
     {id:"rubrica",label:"Acompanhamento / Rubricas"},
+    {id:"reunioes",label:"Reuniões"},
   ];
 
   function renderCadastro(s) {
@@ -1543,6 +1789,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
               {tab==="pend" && <PendenciasTab escola={sel} onSave={save} autor={equipeLogada?.equipe || "—"} />}
               {tab==="proj" && <ProjetosTab escola={sel} supabaseClient={supabase}/>}
               {tab==="rubrica" && <RubricasTab escola={sel} supabaseClient={supabase} autor={equipeLogada?.equipe || "—"} onSave={save} />}
+              {tab==="reunioes" && <ReuniaoTab escola={sel} autor={equipeLogada?.equipe || "—"} onSave={save} />}
             </div>
           </div>
         )}

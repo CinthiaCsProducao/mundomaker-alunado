@@ -1568,6 +1568,14 @@ export default function Dashboard() {
   const [senha, setSenha]               = useState("");
   const [erroLogin, setErroLogin]       = useState("");
   const [manterLogado, setManterLogado] = useState(false);
+  // Fluxo esqueci a senha
+  const [senhaStep, setSenhaStep]       = useState("login"); // "login"|"email"|"link"|"newpass"
+  const [senhaEmail, setSenhaEmail]     = useState("");
+  const [senhaToken, setSenhaToken]     = useState("");
+  const [senhaMsg, setSenhaMsg]         = useState("");
+  const [novaSenha1, setNovaSenha1]     = useState("");
+  const [novaSenha2, setNovaSenha2]     = useState("");
+  const [senhaOk, setSenhaOk]           = useState(false);
   const [escolas, setEscolas]           = useState([]);
   const [todosEnvios, setTodosEnvios]   = useState([]);
   const [loading, setLoading]           = useState(false);
@@ -1617,6 +1625,67 @@ export default function Dashboard() {
       }
     } catch {
       setErroLogin("E-mail ou senha incorretos.");
+    }
+  }
+
+  async function handleGerarReset(e) {
+    e.preventDefault();
+    setSenhaMsg("");
+    if (!senhaEmail.trim()) return;
+    try {
+      // Verifica se email existe
+      const { data: usuario } = await supabase
+        .from("usuarios").select("id,email")
+        .eq("email", senhaEmail.trim().toLowerCase())
+        .eq("ativo", true)
+        .single();
+      if (!usuario) {
+        setSenhaMsg("E-mail não encontrado.");
+        return;
+      }
+      // Gera token UUID e salva no DB com validade de 1h
+      const token   = crypto.randomUUID();
+      const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      await supabase.from("usuarios").update({ reset_token: token, reset_expires: expires }).eq("id", usuario.id);
+      setSenhaToken(token);
+      setSenhaStep("link");
+    } catch {
+      setSenhaMsg("Erro ao gerar link. Tente novamente.");
+    }
+  }
+
+  async function handleNovaSenha(e) {
+    e.preventDefault();
+    setSenhaMsg("");
+    if (!novaSenha1 || novaSenha1 !== novaSenha2) {
+      setSenhaMsg("As senhas não coincidem.");
+      return;
+    }
+    if (novaSenha1.length < 6) {
+      setSenhaMsg("Senha deve ter ao menos 6 caracteres.");
+      return;
+    }
+    try {
+      // Valida token no DB
+      const { data: usuario } = await supabase
+        .from("usuarios").select("id,reset_expires")
+        .eq("reset_token", senhaToken)
+        .eq("ativo", true)
+        .single();
+      if (!usuario) { setSenhaMsg("Link inválido ou expirado."); return; }
+      if (new Date(usuario.reset_expires) < new Date()) { setSenhaMsg("Link expirado. Gere um novo."); return; }
+      // Hash e salva nova senha
+      const enc  = new TextEncoder();
+      const buf  = await crypto.subtle.digest("SHA-256", enc.encode(novaSenha1));
+      const hash = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+      await supabase.from("usuarios").update({ senha: hash, reset_token: null, reset_expires: null }).eq("id", usuario.id);
+      setSenhaOk(true);
+      setTimeout(() => {
+        setSenhaStep("login"); setSenhaToken(""); setSenhaEmail("");
+        setNovaSenha1(""); setNovaSenha2(""); setSenhaOk(false); setSenhaMsg("");
+      }, 3000);
+    } catch {
+      setSenhaMsg("Erro ao salvar senha. Tente novamente.");
     }
   }
 
@@ -1743,6 +1812,8 @@ export default function Dashboard() {
   const perm    = equipeLogada?.permissoes || {};
   const isAdmin = perm.admin === true;
 
+  const inpLogin = { width: "100%", padding: "11px 14px", border: "1.5px solid #ddd", borderRadius: 4, fontSize: 14, fontFamily: font, boxSizing: "border-box" };
+
   if (!logado) return (
     <div style={{ minHeight: "100vh", background: "#39DF18", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font }}>
       <div style={{ background: "#fff", borderRadius: 8, padding: "48px 56px", maxWidth: 400, width: "100%", margin: 20, boxShadow: "0 4px 24px rgba(0,0,0,0.12)" }}>
@@ -1751,35 +1822,123 @@ export default function Dashboard() {
           <div style={{ fontSize: 22, fontWeight: 800, color: "#111", marginTop: 8 }}>Mundo Maker</div>
           <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>Dashboard de Alunado</div>
         </div>
-        <form onSubmit={handleLogin}>
-          {erroLogin && (
-            <div style={{ background: "#fff0f0", border: "1.5px solid #FF3B41", color: "#cc0000", borderRadius: 4, padding: "10px 14px", fontSize: 13, marginBottom: 16 }}>
-              {erroLogin}
+
+        {/* ── Login normal ── */}
+        {senhaStep === "login" && (
+          <form onSubmit={handleLogin}>
+            {erroLogin && (
+              <div style={{ background: "#fff0f0", border: "1.5px solid #FF3B41", color: "#cc0000", borderRadius: 4, padding: "10px 14px", fontSize: 13, marginBottom: 16 }}>
+                {erroLogin}
+              </div>
+            )}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 6 }}>E-mail</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="seu@email.com" style={inpLogin} />
             </div>
-          )}
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 6 }}>E-mail</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="seu@email.com"
-              style={{ width: "100%", padding: "11px 14px", border: "1.5px solid #ddd", borderRadius: 4, fontSize: 14, fontFamily: font, boxSizing: "border-box" }} />
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 6 }}>Senha</label>
-            <input type="password" value={senha} onChange={e => setSenha(e.target.value)}
-              placeholder="Digite a senha"
-              style={{ width: "100%", padding: "11px 14px", border: "1.5px solid #ddd", borderRadius: 4, fontSize: 14, fontFamily: font, boxSizing: "border-box" }} />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, cursor: "pointer" }}
-            onClick={() => setManterLogado(m => !m)}>
-            <div style={{ width: 18, height: 18, border: `2px solid ${manterLogado ? "#39DF18" : "#ccc"}`, borderRadius: 3, background: manterLogado ? "#39DF18" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
-              {manterLogado && <span style={{ fontSize: 11, fontWeight: 900, color: "#000" }}>v</span>}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 6 }}>Senha</label>
+              <input type="password" value={senha} onChange={e => setSenha(e.target.value)}
+                placeholder="Digite a senha" style={inpLogin} />
             </div>
-            <span style={{ fontSize: 13, color: "#555", userSelect: "none" }}>Manter conectado</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, cursor: "pointer" }}
+              onClick={() => setManterLogado(m => !m)}>
+              <div style={{ width: 18, height: 18, border: `2px solid ${manterLogado ? "#39DF18" : "#ccc"}`, borderRadius: 3, background: manterLogado ? "#39DF18" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+                {manterLogado && <span style={{ fontSize: 11, fontWeight: 900, color: "#000" }}>v</span>}
+              </div>
+              <span style={{ fontSize: 13, color: "#555", userSelect: "none" }}>Manter conectado</span>
+            </div>
+            <button type="submit" style={{ width: "100%", padding: "14px", background: "#39DF18", color: "#000", border: "none", borderRadius: 4, fontSize: 14, fontWeight: 800, fontFamily: font, cursor: "pointer", letterSpacing: 1, textTransform: "uppercase" }}>
+              ENTRAR
+            </button>
+            <div style={{ textAlign: "center", marginTop: 16 }}>
+              <button type="button" onClick={() => { setSenhaStep("email"); setSenhaEmail(""); setSenhaMsg(""); }}
+                style={{ background: "none", border: "none", color: "#888", fontSize: 13, cursor: "pointer", textDecoration: "underline", fontFamily: font }}>
+                Esqueci minha senha
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ── Step: digitar e-mail ── */}
+        {senhaStep === "email" && (
+          <form onSubmit={handleGerarReset}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#111", marginBottom: 8 }}>Redefinir senha</div>
+            <div style={{ fontSize: 13, color: "#666", marginBottom: 18 }}>
+              Digite seu e-mail cadastrado para gerar o link de redefinição.
+            </div>
+            {senhaMsg && (
+              <div style={{ background: "#fff0f0", border: "1.5px solid #FF3B41", color: "#cc0000", borderRadius: 4, padding: "10px 14px", fontSize: 13, marginBottom: 14 }}>
+                {senhaMsg}
+              </div>
+            )}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 6 }}>E-mail</label>
+              <input type="email" value={senhaEmail} onChange={e => setSenhaEmail(e.target.value)}
+                placeholder="seu@email.com" style={inpLogin} autoFocus />
+            </div>
+            <button type="submit" style={{ width: "100%", padding: "13px", background: "#39DF18", color: "#000", border: "none", borderRadius: 4, fontSize: 14, fontWeight: 800, fontFamily: font, cursor: "pointer" }}>
+              Gerar link de redefinição
+            </button>
+            <div style={{ textAlign: "center", marginTop: 14 }}>
+              <button type="button" onClick={() => setSenhaStep("login")}
+                style={{ background: "none", border: "none", color: "#888", fontSize: 13, cursor: "pointer", textDecoration: "underline", fontFamily: font }}>
+                ← Voltar ao login
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ── Step: link gerado ── */}
+        {senhaStep === "link" && (
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#111", marginBottom: 8 }}>Link gerado!</div>
+            <div style={{ fontSize: 13, color: "#666", marginBottom: 18 }}>
+              Clique no botão abaixo para criar uma nova senha. O link expira em 1 hora.
+            </div>
+            <button onClick={() => setSenhaStep("newpass")}
+              style={{ width: "100%", padding: "13px", background: "#39DF18", color: "#000", border: "none", borderRadius: 4, fontSize: 14, fontWeight: 800, fontFamily: font, cursor: "pointer", marginBottom: 12 }}>
+              🔑 Criar nova senha
+            </button>
+            <div style={{ textAlign: "center" }}>
+              <button onClick={() => setSenhaStep("login")}
+                style={{ background: "none", border: "none", color: "#888", fontSize: 13, cursor: "pointer", textDecoration: "underline", fontFamily: font }}>
+                ← Voltar ao login
+              </button>
+            </div>
           </div>
-          <button type="submit" style={{ width: "100%", padding: "14px", background: "#39DF18", color: "#000", border: "none", borderRadius: 4, fontSize: 14, fontWeight: 800, fontFamily: font, cursor: "pointer", letterSpacing: 1, textTransform: "uppercase" }}>
-            ENTRAR
-          </button>
-        </form>
+        )}
+
+        {/* ── Step: nova senha ── */}
+        {senhaStep === "newpass" && (
+          <form onSubmit={handleNovaSenha}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#111", marginBottom: 8 }}>Nova senha</div>
+            {senhaOk && (
+              <div style={{ background: "#f0fff4", border: "1.5px solid #39DF18", color: "#166534", borderRadius: 4, padding: "10px 14px", fontSize: 13, marginBottom: 14, textAlign: "center", fontWeight: 700 }}>
+                ✅ Senha alterada com sucesso! Redirecionando...
+              </div>
+            )}
+            {senhaMsg && !senhaOk && (
+              <div style={{ background: "#fff0f0", border: "1.5px solid #FF3B41", color: "#cc0000", borderRadius: 4, padding: "10px 14px", fontSize: 13, marginBottom: 14 }}>
+                {senhaMsg}
+              </div>
+            )}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 6 }}>Nova senha</label>
+              <input type="password" value={novaSenha1} onChange={e => setNovaSenha1(e.target.value)}
+                placeholder="Mínimo 6 caracteres" style={inpLogin} autoFocus />
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 6 }}>Confirmar senha</label>
+              <input type="password" value={novaSenha2} onChange={e => setNovaSenha2(e.target.value)}
+                placeholder="Repita a nova senha" style={inpLogin} />
+            </div>
+            <button type="submit" disabled={senhaOk}
+              style={{ width: "100%", padding: "13px", background: "#39DF18", color: "#000", border: "none", borderRadius: 4, fontSize: 14, fontWeight: 800, fontFamily: font, cursor: senhaOk ? "default" : "pointer", opacity: senhaOk ? 0.6 : 1 }}>
+              💾 Salvar nova senha
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );
