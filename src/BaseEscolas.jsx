@@ -1215,8 +1215,9 @@ function ReuniaoTab({ escola, autor, onSave }) {
 
   const [showForm, setShowForm]     = useState(false);
   const [salvando, setSalvando]     = useState(false);
-  const [concluindo, setConcluindo] = useState(null); // id da reunião sendo concluída
-  const [relatoFinal, setRelatoFinal] = useState("");
+  const [concluindo, setConcluindo]         = useState(null); // id da reunião sendo concluída
+  const [statusPendente, setStatusPendente] = useState(null); // "Realizada" | "Não aconteceu"
+  const [relatoFinal, setRelatoFinal]       = useState("");
   const [form, setForm] = useState({
     data_agendada: "", tipo: "Presencial", areas: [], envolvidos: "", notas: ""
   });
@@ -1303,13 +1304,18 @@ function ReuniaoTab({ escola, autor, onSave }) {
               </div>
             )}
             {r.relato && (
-              <div style={{ fontSize:12, color:"#444", marginTop:6, background:"#f9fafb", borderRadius:6, padding:"8px 12px" }}>
-                <strong>Resumo:</strong> {r.relato}
+              <div style={{ fontSize:13, color:"#333", marginTop:8, background: r.status === "Realizada" ? "#f0fdf4" : "#fff5f5",
+                border: "1.5px solid " + (r.status === "Realizada" ? "#bbf7d0" : "#fecaca"),
+                borderRadius:6, padding:"10px 14px" }}>
+                <div style={{ fontSize:11, fontWeight:700, color: r.status === "Realizada" ? "#166534" : "#991b1b", marginBottom:4, textTransform:"uppercase", letterSpacing:0.5 }}>
+                  {r.status === "Realizada" ? "✅ Relato da reunião" : "❌ Motivo / o que aconteceu"}
+                </div>
+                {r.relato}
               </div>
             )}
             {r.concluida_em && (
-              <div style={{ fontSize:11, color:"#888", marginTop:4 }}>
-                Concluída por <strong>{r.concluida_por}</strong> em {new Date(r.concluida_em).toLocaleDateString("pt-BR")}
+              <div style={{ fontSize:11, color:"#aaa", marginTop:6 }}>
+                Registrado por <strong>{r.concluida_por}</strong> em {new Date(r.concluida_em).toLocaleDateString("pt-BR")}
               </div>
             )}
             <div style={{ fontSize:11, color:"#aaa", marginTop:4 }}>
@@ -1317,33 +1323,47 @@ function ReuniaoTab({ escola, autor, onSave }) {
             </div>
           </div>
           {r.status === "Agendada" && (
-            <button onClick={() => { setConcluindo(r.id); setRelatoFinal(""); }}
-              style={{ ...btnBase, background:"#111", color:"#fff", whiteSpace:"nowrap" }}>
-              ✓ Concluir
-            </button>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              <button onClick={() => { setConcluindo(r.id); setStatusPendente("Realizada"); setRelatoFinal(""); }}
+                style={{ ...btnBase, background:"#22c55e", color:"#fff", whiteSpace:"nowrap" }}>
+                ✅ Realizada
+              </button>
+              <button onClick={() => { setConcluindo(r.id); setStatusPendente("Não aconteceu"); setRelatoFinal(""); }}
+                style={{ ...btnBase, background:"#ef4444", color:"#fff", whiteSpace:"nowrap" }}>
+                ❌ Não realizada
+              </button>
+            </div>
           )}
         </div>
 
         {/* Painel de conclusão */}
         {concluindo === r.id && (
-          <div style={{ marginTop:14, background:"#f9fafb", borderRadius:8, padding:14, border:"1.5px solid #e5e7eb" }}>
-            <div style={{ fontSize:13, fontWeight:700, marginBottom:10, color:"#333" }}>Como foi a reunião?</div>
+          <div style={{ marginTop:14, background:"#f9fafb", borderRadius:8, padding:14, border:"1.5px solid " + (statusPendente === "Realizada" ? "#22c55e" : "#ef4444") }}>
+            <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color: statusPendente === "Realizada" ? "#166534" : "#991b1b" }}>
+              {statusPendente === "Realizada" ? "✅ Reunião realizada" : "❌ Reunião não realizada"}
+            </div>
+            <div style={{ fontSize:12, color:"#666", marginBottom:10 }}>Descreva o que aconteceu — campo obrigatório</div>
             <textarea
               value={relatoFinal} onChange={e => setRelatoFinal(e.target.value)}
-              placeholder="Resumo do que foi tratado (opcional)..."
-              rows={3}
-              style={{ ...inpStyle, resize:"vertical", marginBottom:10 }}
+              placeholder="O que foi tratado? Quais foram os encaminhamentos? Próximos passos?..."
+              rows={4}
+              style={{ ...inpStyle, resize:"vertical", marginBottom:10,
+                border: "1.5px solid " + (relatoFinal.trim() ? "#DCDDDE" : "#ef4444") }}
             />
+            {!relatoFinal.trim() && (
+              <div style={{ fontSize:11, color:"#ef4444", marginBottom:8 }}>Preencha o relato para confirmar.</div>
+            )}
             <div style={{ display:"flex", gap:8 }}>
-              <button onClick={() => concluirReuniao(r.id, "Realizada")}
-                style={{ ...btnBase, background:"#22c55e", color:"#fff" }}>
-                ✅ Reunião realizada
+              <button onClick={() => concluirReuniao(r.id, statusPendente)}
+                disabled={!relatoFinal.trim()}
+                style={{ ...btnBase,
+                  background: statusPendente === "Realizada" ? "#22c55e" : "#ef4444",
+                  color:"#fff",
+                  opacity: relatoFinal.trim() ? 1 : 0.4,
+                  cursor: relatoFinal.trim() ? "pointer" : "not-allowed" }}>
+                💾 Confirmar
               </button>
-              <button onClick={() => concluirReuniao(r.id, "Não aconteceu")}
-                style={{ ...btnBase, background:"#ef4444", color:"#fff" }}>
-                ❌ Não aconteceu (no-show)
-              </button>
-              <button onClick={() => setConcluindo(null)}
+              <button onClick={() => { setConcluindo(null); setStatusPendente(null); setRelatoFinal(""); }}
                 style={{ ...btnBase, background:"#e5e7eb", color:"#555" }}>
                 Cancelar
               </button>
