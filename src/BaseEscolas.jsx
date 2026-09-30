@@ -1,3 +1,4 @@
+// v2.1 - aba reunioes
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 
