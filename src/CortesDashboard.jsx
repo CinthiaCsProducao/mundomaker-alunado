@@ -138,6 +138,7 @@ export default function CortesDashboard({ onVoltar }) {
   const [salvando, setSalvando]     = useState({});
   const [calculando, setCalculando] = useState(false);
   const [calcMsg, setCalcMsg]       = useState("");
+  const [salvandoTudo, setSalvandoTudo] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -306,6 +307,38 @@ export default function CortesDashboard({ onVoltar }) {
       </table>
     </body></html>`);
     win.document.close();
+  }
+
+  async function salvarTudo() {
+    setSalvandoTudo(true);
+    setCalcMsg("Salvando todos os dados...");
+    try {
+      const newRows = { ...rows };
+      for (const proj of projetos) {
+        const row = rows[proj];
+        if (!row) continue;
+        const patch = { ...row, atualizado_em: new Date().toISOString() };
+        if (patch.id) {
+          await supabase.from("cortes_conferencia").update(patch).eq("id", patch.id);
+        } else {
+          const campos = { projeto: proj, envio };
+          // inclui todos os campos preenchidos
+          [...BLOCOS.map(b => `qtd_${b.key}`), ...CAMPOS.flatMap(c => BLOCOS.map(b => `${c.key}_${b.key}`))].forEach(k => {
+            if (row[k] != null) campos[k] = row[k];
+          });
+          const { data } = await supabase.from("cortes_conferencia")
+            .upsert(campos, { onConflict: "projeto,envio" })
+            .select().single();
+          if (data) newRows[proj] = { ...patch, ...data };
+        }
+      }
+      setRows(newRows);
+      setCalcMsg("✓ Todos os dados salvos com sucesso!");
+      setTimeout(() => setCalcMsg(""), 3000);
+    } catch (err) {
+      setCalcMsg("Erro ao salvar: " + (err.message || "Tente novamente."));
+    }
+    setSalvandoTudo(false);
   }
 
   async function calcularQuantidades() {
@@ -483,6 +516,18 @@ export default function CortesDashboard({ onVoltar }) {
               </button>
             ))}
             <button
+              onClick={salvarTudo}
+              disabled={salvandoTudo || loading || projetos.length === 0}
+              style={{
+                padding: "8px 20px", border: "none", borderRadius: 6, fontWeight: 800,
+                fontFamily: font, fontSize: 13, cursor: salvandoTudo ? "wait" : "pointer",
+                background: salvandoTudo ? "rgba(255,255,255,.2)" : VERDE,
+                color: salvandoTudo ? "#fff" : PRETO, whiteSpace: "nowrap",
+                opacity: projetos.length === 0 ? 0.5 : 1,
+              }}>
+              {salvandoTudo ? "Salvando..." : "💾 Salvar Tudo"}
+            </button>
+            <button
               onClick={calcularQuantidades}
               disabled={calculando || loading || projetos.length === 0}
               style={{
@@ -626,7 +671,7 @@ export default function CortesDashboard({ onVoltar }) {
               </table>
             </div>
             <div style={{ marginTop: 8, fontSize: 11, color: "#aaa", fontFamily: font }}>
-              Clique em qualquer célula para editar — salvo automaticamente ao sair do campo.
+              Clique em qualquer célula para editar. Use <strong style={{ color: VERDE }}>💾 Salvar Tudo</strong> para garantir que todos os dados foram gravados antes de sair.
               Use <strong style={{ color: "#FFA300" }}>⚡ Calcular Quantidades</strong> para preencher as qtds automaticamente.
               {" "}<strong style={{ color: "#1D6F42" }}>↓ Excel</strong> baixa CSV compatível com Excel.
               {" "}<strong style={{ color: "#CC3333" }}>↓ PDF</strong> abre janela de impressão.
