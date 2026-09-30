@@ -1211,7 +1211,7 @@ function RubricasTab({ escola, supabaseClient, autor, onSave }) {
 
 // ── Aba Reuniões ─────────────────────────────────────────────────
 function ReuniaoTab({ escola, autor, onSave }) {
-  const AREAS = ["Comercial","Pedagógico","Financeiro","Operacional","Diretoria","Suporte","Outra"];
+  const AREAS = ["CS","Pedagógico","Financeiro","Produção","Diretoria","Comercial","Núcleo Técnico"];
 
   const [showForm, setShowForm]     = useState(false);
   const [salvando, setSalvando]     = useState(false);
