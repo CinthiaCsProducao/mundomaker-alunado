@@ -1968,47 +1968,47 @@ export default function Dashboard() {
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           {perm.historico && (
             <button onClick={() => setView(view === "historico" ? "dashboard" : "historico")}
-              style={{ background: view === "historico" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+              style={{ background: view === "historico" ? "#000" : "rgba(0,0,0,0.12)", color: view === "historico" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
               Historico de Ciclos {ciclosHist.length > 0 && `(${ciclosHist.length})`}
             </button>
           )}
           {perm.escolas && (
             <button onClick={() => setView(view === "escolas" ? "dashboard" : "escolas")}
-              style={{ background: view === "escolas" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+              style={{ background: view === "escolas" ? "#000" : "rgba(0,0,0,0.12)", color: view === "escolas" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
               Escolas
             </button>
           )}
           {perm.inspiramaker && (
             <button onClick={() => setView(view === "inspiramaker" ? "dashboard" : "inspiramaker")}
-              style={{ background: view === "inspiramaker" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+              style={{ background: view === "inspiramaker" ? "#000" : "rgba(0,0,0,0.12)", color: view === "inspiramaker" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
               Inspiramaker
             </button>
           )}
           {perm.projecao && (
             <button onClick={() => setView(view === "projecao" ? "dashboard" : "projecao")}
-              style={{ background: view === "projecao" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+              style={{ background: view === "projecao" ? "#000" : "rgba(0,0,0,0.12)", color: view === "projecao" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
               Projecao de Material
             </button>
           )}
           {perm.baseEscolas && (
             <button onClick={() => setView(view === "baseescolas" ? "dashboard" : "baseescolas")}
-              style={{ background: view === "baseescolas" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+              style={{ background: view === "baseescolas" ? "#000" : "rgba(0,0,0,0.12)", color: view === "baseescolas" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
               Base Escolas
             </button>
           )}
           {perm.projecao && (
             <button onClick={() => setView(view === "cortes" ? "dashboard" : "cortes")}
-              style={{ background: view === "cortes" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+              style={{ background: view === "cortes" ? "#000" : "rgba(0,0,0,0.12)", color: view === "cortes" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
               Conf. Cortes
             </button>
           )}
           <button onClick={() => setView(view === "romaneio" ? "dashboard" : "romaneio")}
-            style={{ background: view === "romaneio" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+            style={{ background: view === "romaneio" ? "#000" : "rgba(0,0,0,0.12)", color: view === "romaneio" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
             Romaneio
           </button>
           {isAdmin && (
             <button onClick={() => setView(view === "usuarios" ? "dashboard" : "usuarios")}
-              style={{ background: view === "usuarios" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+              style={{ background: view === "usuarios" ? "#000" : "rgba(0,0,0,0.12)", color: view === "usuarios" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
               Usuários
             </button>
           )}
