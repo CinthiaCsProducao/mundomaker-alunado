@@ -1,0 +1,25 @@
+{
+  "geradoEm": "2026-10-02T19:28:20.203Z",
+  "por": "scripts/exportar-aba.mjs (Gerador de Romaneio)",
+  "arquivos": {
+    "App.tsx": "552dba212fc099b8ed9c0680ec2e64a7",
+    "LEIAME.md": "cfbf5edca8bc34dc5f2c52b36591ea97",
+    "RomaneioTab.tsx": "4fab871a3699b2821fb533f272dc65a9",
+    "components/BotaoTema.tsx": "1eee96aea12fb80f1084a43169e32892",
+    "components/ManifestView.tsx": "7d104b9f955b34ba41f099766d1e5658",
+    "components/OrderInput.tsx": "502002dcfc6506f7fe9348b935f61254",
+    "constants/assets.ts": "78b2c42870257e8792925e74db48967d",
+    "data/iconesXlsx.ts": "ec6262d2bb832763453d2bbb2d8a528c",
+    "data/products.ts": "c486d1139f24a4759f40b42b5c301912",
+    "dependencias.json": "526a1fa64cfbc77808a8b551754d38be",
+    "index.ts": "fe07a81345128bca2bfa2098e6f852d3",
+    "lib/exportXlsx.ts": "2a030bcb63c5be1575dce2f53c97a05b",
+    "lib/formatoRomaneio.ts": "8f988ba28ed0a62b6143688128622bf6",
+    "lib/packaging.ts": "4f3f665f92d93eb44ba0a49ccfc5dbe9",
+    "lib/projectGroups.ts": "2b06e01eb53c856e58e28352f32a3c2c",
+    "lib/schoolYears.ts": "12d9c49d084f9a3f9d66ffb569c4e809",
+    "lib/tema.ts": "36021097b49bacd8d7778e2f23520576",
+    "romaneio-tab.css": "9346afbe33c8cf467673e105e0b7e1dc",
+    "types.ts": "0fe94ae1a81ea23a47cfb6357d40e7ee"
+  }
+}

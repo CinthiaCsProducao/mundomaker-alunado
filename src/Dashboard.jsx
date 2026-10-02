@@ -1,8 +1,9 @@
-// v2.1 - esqueci senha + reunioes
+// v2.2 - esqueci senha + reunioes + romaneio
 import { useState, useEffect } from "react";
 import BaseEscolas from "./BaseEscolas";
 import GerenciarUsuarios from "./GerenciarUsuarios";
 import CortesDashboard from "./CortesDashboard";
+import RomaneioTab from "./romaneio-tab";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -2001,6 +2002,10 @@ export default function Dashboard() {
               Conf. Cortes
             </button>
           )}
+          <button onClick={() => setView(view === "romaneio" ? "dashboard" : "romaneio")}
+            style={{ background: view === "romaneio" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+            Romaneio
+          </button>
           {isAdmin && (
             <button onClick={() => setView(view === "usuarios" ? "dashboard" : "usuarios")}
               style={{ background: view === "usuarios" ? "#000" : "rgba(0,0,0,0.12)", color: "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
@@ -2043,6 +2048,20 @@ export default function Dashboard() {
 
       {view === "cortes" && (
         <CortesDashboard onVoltar={() => setView("dashboard")} />
+      )}
+
+      {view === "romaneio" && (
+        <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: "8px 16px", background: "#f5f5f5", borderBottom: "1px solid #e0e0e0" }}>
+            <button onClick={() => setView("dashboard")}
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#555", fontFamily: font }}>
+              ← Voltar ao Dashboard
+            </button>
+          </div>
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            <RomaneioTab altura="calc(100vh - 41px)" />
+          </div>
+        </div>
       )}
 
       {view === "usuarios" && (
