@@ -144,13 +144,16 @@ export default function CortesDashboard({ onVoltar }) {
     setLoading(true);
 
     const col = `envio_${envio}`;
+    const selectCols = envio === 1 ? `${col}, introdutorio` : col;
     const { data: pe } = await supabase
       .from("projetos_escola")
-      .select(col)
+      .select(selectCols)
       .not(col, "is", null)
       .neq(col, "");
 
-    const unicos = [...new Set((pe || []).map(r => r[col]).filter(Boolean))].sort();
+    const set1 = (pe || []).map(r => r[col]).filter(Boolean);
+    const set2 = envio === 1 ? (pe || []).map(r => r.introdutorio).filter(Boolean) : [];
+    const unicos = [...new Set([...set1, ...set2])].sort();
     setProjetos(unicos);
 
     const { data: cortes } = await supabase
@@ -348,9 +351,10 @@ export default function CortesDashboard({ onVoltar }) {
       const col = `envio_${envio}`;
 
       // 1. Todas as linhas de projetos_escola para este envio
+      const selectCalcCols = envio === 1 ? `escola_id, serie, ${col}, introdutorio` : `escola_id, serie, ${col}`;
       const { data: allPE } = await supabase
         .from("projetos_escola")
-        .select(`escola_id, serie, ${col}`)
+        .select(selectCalcCols)
         .not(col, "is", null)
         .neq(col, "")
         .neq(col, "-");
@@ -408,7 +412,7 @@ export default function CortesDashboard({ onVoltar }) {
       setCalcMsg("Calculando quantidades por projeto...");
       const resultados = {};
       projetos.forEach(proj => {
-        const peForProj = allPE.filter(r => r[col] === proj);
+        const peForProj = allPE.filter(r => r[col] === proj || (envio === 1 && r.introdutorio === proj));
         let totalBase = 0, totalComp = 0, totalProf = 0;
 
         peForProj.forEach(pe => {
