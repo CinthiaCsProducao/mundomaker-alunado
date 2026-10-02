@@ -488,6 +488,7 @@ export default function CortesDashboard({ onVoltar }) {
     padding: "7px 8px", fontSize: 10, fontWeight: 700, fontFamily: font,
     textTransform: "uppercase", letterSpacing: ".04em", color: "#5a5a5a",
     textAlign: align, whiteSpace: "nowrap", background: "#e8f5e2", borderBottom: "2px solid #c5e6b0",
+    position: "sticky", top: 0, zIndex: 1,
   });
   const tdStyle = (bold) => ({
     padding: "5px 8px", borderTop: "1px solid #ececec", fontSize: 12,
@@ -593,7 +594,7 @@ export default function CortesDashboard({ onVoltar }) {
             </div>
 
             {/* Tabela */}
-            <div style={{ overflowX: "auto", background: "#fff", borderRadius: 8, boxShadow: "0 2px 8px rgba(0,0,0,.07)", border: "1px solid #e8e8e8" }}>
+            <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 320px)", background: "#fff", borderRadius: 8, boxShadow: "0 2px 8px rgba(0,0,0,.07)", border: "1px solid #e8e8e8" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
                   <tr>
