@@ -242,6 +242,7 @@ export default function AlunadoForm() {
       idioma_material: escolaBase.idioma || "Português",
       programa: prog,
       logradouro: escolaBase.logradouro || "",
+      numero: escolaBase.numero || "",
       bairro: escolaBase.bairro || "",
       cidade: escolaBase.cidade || "",
       estado: escolaBase.uf || "",
