@@ -1209,6 +1209,113 @@ function RubricasTab({ escola, supabaseClient, autor, onSave }) {
   );
 }
 
+// ── Card de Reunião (fora do ReuniaoTab para evitar remount a cada digitação) ──
+function CardReuniao({ r, concluindo, setConcluindo, statusPendente, setStatusPendente, relatoFinal, setRelatoFinal, concluirReuniao }) {
+  const inpStyle = { width:"100%", border:"1.5px solid #DCDDDE", borderRadius:6, padding:"9px 12px", fontSize:13, fontFamily:fontB, boxSizing:"border-box" };
+  const btnBase  = { border:"none", borderRadius:6, padding:"8px 16px", fontSize:12, fontWeight:700, fontFamily:fontB, cursor:"pointer" };
+  const dt = r.data_agendada ? new Date(r.data_agendada).toLocaleString("pt-BR", { dateStyle:"short", timeStyle:"short" }) : "—";
+  const statusColor = r.status === "Agendada" ? "#f59e0b" : r.status === "Realizada" ? "#22c55e" : "#ef4444";
+  const statusLabel = r.status === "Agendada" ? "🟡 Agendada" : r.status === "Realizada" ? "✅ Realizada" : "❌ Não aconteceu";
+
+  return (
+    <div style={{ border:"1.5px solid #e5e7eb", borderRadius:8, padding:16, marginBottom:12, background:"#fff" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:8 }}>
+        <div>
+          <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+            <span style={{ fontSize:15, fontWeight:800, color:"#111" }}>{dt}</span>
+            <span style={{ fontSize:11, fontWeight:700, padding:"2px 10px", borderRadius:999,
+              background: r.tipo === "Presencial" ? "#dcfce7" : "#dbeafe",
+              color: r.tipo === "Presencial" ? "#166534" : "#1d4ed8" }}>
+              {r.tipo === "Presencial" ? "🏢 Presencial" : "💻 Online"}
+            </span>
+            <span style={{ fontSize:11, fontWeight:700, color: statusColor }}>{statusLabel}</span>
+          </div>
+          {r.areas && r.areas.length > 0 && (
+            <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginTop:6 }}>
+              {r.areas.map(a => (
+                <span key={a} style={{ fontSize:11, background:"#f3f4f6", borderRadius:4, padding:"2px 8px", color:"#555" }}>{a}</span>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize:13, color:"#444", marginTop:6 }}>
+            <strong>Envolvidos:</strong> {r.envolvidos}
+          </div>
+          {r.notas && r.status === "Agendada" && (
+            <div style={{ fontSize:12, color:"#666", marginTop:4 }}>
+              <strong>Notas:</strong> {r.notas}
+            </div>
+          )}
+          {r.relato && (
+            <div style={{ fontSize:13, color:"#333", marginTop:8, background: r.status === "Realizada" ? "#f0fdf4" : "#fff5f5",
+              border: "1.5px solid " + (r.status === "Realizada" ? "#bbf7d0" : "#fecaca"),
+              borderRadius:6, padding:"10px 14px" }}>
+              <div style={{ fontSize:11, fontWeight:700, color: r.status === "Realizada" ? "#166534" : "#991b1b", marginBottom:4, textTransform:"uppercase", letterSpacing:0.5 }}>
+                {r.status === "Realizada" ? "✅ Relato da reunião" : "❌ Motivo / o que aconteceu"}
+              </div>
+              {r.relato}
+            </div>
+          )}
+          {r.concluida_em && (
+            <div style={{ fontSize:11, color:"#aaa", marginTop:6 }}>
+              Registrado por <strong>{r.concluida_por}</strong> em {new Date(r.concluida_em).toLocaleDateString("pt-BR")}
+            </div>
+          )}
+          <div style={{ fontSize:11, color:"#aaa", marginTop:4 }}>
+            Criada por {r.criado_por} em {r.criado_em ? new Date(r.criado_em).toLocaleDateString("pt-BR") : "—"}
+          </div>
+        </div>
+        {r.status === "Agendada" && (
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+            <button onClick={() => { setConcluindo(r.id); setStatusPendente("Realizada"); setRelatoFinal(""); }}
+              style={{ ...btnBase, background:"#22c55e", color:"#fff", whiteSpace:"nowrap" }}>
+              ✅ Realizada
+            </button>
+            <button onClick={() => { setConcluindo(r.id); setStatusPendente("Não aconteceu"); setRelatoFinal(""); }}
+              style={{ ...btnBase, background:"#ef4444", color:"#fff", whiteSpace:"nowrap" }}>
+              ❌ Não realizada
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Painel de conclusão */}
+      {concluindo === r.id && (
+        <div style={{ marginTop:14, background:"#f9fafb", borderRadius:8, padding:14, border:"1.5px solid " + (statusPendente === "Realizada" ? "#22c55e" : "#ef4444") }}>
+          <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color: statusPendente === "Realizada" ? "#166534" : "#991b1b" }}>
+            {statusPendente === "Realizada" ? "✅ Reunião realizada" : "❌ Reunião não realizada"}
+          </div>
+          <div style={{ fontSize:12, color:"#666", marginBottom:10 }}>Descreva o que aconteceu — campo obrigatório</div>
+          <textarea
+            value={relatoFinal} onChange={e => setRelatoFinal(e.target.value)}
+            placeholder="O que foi tratado? Quais foram os encaminhamentos? Próximos passos?..."
+            rows={4}
+            style={{ ...inpStyle, resize:"vertical", marginBottom:10,
+              border: "1.5px solid " + (relatoFinal.trim() ? "#DCDDDE" : "#ef4444") }}
+          />
+          {!relatoFinal.trim() && (
+            <div style={{ fontSize:11, color:"#ef4444", marginBottom:8 }}>Preencha o relato para confirmar.</div>
+          )}
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={() => concluirReuniao(r.id, statusPendente)}
+              disabled={!relatoFinal.trim()}
+              style={{ ...btnBase,
+                background: statusPendente === "Realizada" ? "#22c55e" : "#ef4444",
+                color:"#fff",
+                opacity: relatoFinal.trim() ? 1 : 0.4,
+                cursor: relatoFinal.trim() ? "pointer" : "not-allowed" }}>
+              💾 Confirmar
+            </button>
+            <button onClick={() => { setConcluindo(null); setStatusPendente(null); setRelatoFinal(""); }}
+              style={{ ...btnBase, background:"#e5e7eb", color:"#555" }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Aba Reuniões ─────────────────────────────────────────────────
 function ReuniaoTab({ escola, autor, onSave }) {
   const AREAS = ["CS","Pedagógico","Financeiro","Produção","Diretoria","Comercial","Núcleo Técnico"];
@@ -1269,110 +1376,6 @@ function ReuniaoTab({ escola, autor, onSave }) {
 
   const inpStyle = { width:"100%", border:"1.5px solid #DCDDDE", borderRadius:6, padding:"9px 12px", fontSize:13, fontFamily:fontB, boxSizing:"border-box" };
   const btnBase  = { border:"none", borderRadius:6, padding:"8px 16px", fontSize:12, fontWeight:700, fontFamily:fontB, cursor:"pointer" };
-
-  function CardReuniao({ r }) {
-    const dt = r.data_agendada ? new Date(r.data_agendada).toLocaleString("pt-BR", { dateStyle:"short", timeStyle:"short" }) : "—";
-    const statusColor = r.status === "Agendada" ? "#f59e0b" : r.status === "Realizada" ? "#22c55e" : "#ef4444";
-    const statusLabel = r.status === "Agendada" ? "🟡 Agendada" : r.status === "Realizada" ? "✅ Realizada" : "❌ Não aconteceu";
-
-    return (
-      <div style={{ border:"1.5px solid #e5e7eb", borderRadius:8, padding:16, marginBottom:12, background:"#fff" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:8 }}>
-          <div>
-            <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-              <span style={{ fontSize:15, fontWeight:800, color:"#111" }}>{dt}</span>
-              <span style={{ fontSize:11, fontWeight:700, padding:"2px 10px", borderRadius:999,
-                background: r.tipo === "Presencial" ? "#dcfce7" : "#dbeafe",
-                color: r.tipo === "Presencial" ? "#166534" : "#1d4ed8" }}>
-                {r.tipo === "Presencial" ? "🏢 Presencial" : "💻 Online"}
-              </span>
-              <span style={{ fontSize:11, fontWeight:700, color: statusColor }}>{statusLabel}</span>
-            </div>
-            {r.areas && r.areas.length > 0 && (
-              <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginTop:6 }}>
-                {r.areas.map(a => (
-                  <span key={a} style={{ fontSize:11, background:"#f3f4f6", borderRadius:4, padding:"2px 8px", color:"#555" }}>{a}</span>
-                ))}
-              </div>
-            )}
-            <div style={{ fontSize:13, color:"#444", marginTop:6 }}>
-              <strong>Envolvidos:</strong> {r.envolvidos}
-            </div>
-            {r.notas && r.status === "Agendada" && (
-              <div style={{ fontSize:12, color:"#666", marginTop:4 }}>
-                <strong>Notas:</strong> {r.notas}
-              </div>
-            )}
-            {r.relato && (
-              <div style={{ fontSize:13, color:"#333", marginTop:8, background: r.status === "Realizada" ? "#f0fdf4" : "#fff5f5",
-                border: "1.5px solid " + (r.status === "Realizada" ? "#bbf7d0" : "#fecaca"),
-                borderRadius:6, padding:"10px 14px" }}>
-                <div style={{ fontSize:11, fontWeight:700, color: r.status === "Realizada" ? "#166534" : "#991b1b", marginBottom:4, textTransform:"uppercase", letterSpacing:0.5 }}>
-                  {r.status === "Realizada" ? "✅ Relato da reunião" : "❌ Motivo / o que aconteceu"}
-                </div>
-                {r.relato}
-              </div>
-            )}
-            {r.concluida_em && (
-              <div style={{ fontSize:11, color:"#aaa", marginTop:6 }}>
-                Registrado por <strong>{r.concluida_por}</strong> em {new Date(r.concluida_em).toLocaleDateString("pt-BR")}
-              </div>
-            )}
-            <div style={{ fontSize:11, color:"#aaa", marginTop:4 }}>
-              Criada por {r.criado_por} em {r.criado_em ? new Date(r.criado_em).toLocaleDateString("pt-BR") : "—"}
-            </div>
-          </div>
-          {r.status === "Agendada" && (
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-              <button onClick={() => { setConcluindo(r.id); setStatusPendente("Realizada"); setRelatoFinal(""); }}
-                style={{ ...btnBase, background:"#22c55e", color:"#fff", whiteSpace:"nowrap" }}>
-                ✅ Realizada
-              </button>
-              <button onClick={() => { setConcluindo(r.id); setStatusPendente("Não aconteceu"); setRelatoFinal(""); }}
-                style={{ ...btnBase, background:"#ef4444", color:"#fff", whiteSpace:"nowrap" }}>
-                ❌ Não realizada
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Painel de conclusão */}
-        {concluindo === r.id && (
-          <div style={{ marginTop:14, background:"#f9fafb", borderRadius:8, padding:14, border:"1.5px solid " + (statusPendente === "Realizada" ? "#22c55e" : "#ef4444") }}>
-            <div style={{ fontSize:13, fontWeight:700, marginBottom:2, color: statusPendente === "Realizada" ? "#166534" : "#991b1b" }}>
-              {statusPendente === "Realizada" ? "✅ Reunião realizada" : "❌ Reunião não realizada"}
-            </div>
-            <div style={{ fontSize:12, color:"#666", marginBottom:10 }}>Descreva o que aconteceu — campo obrigatório</div>
-            <textarea
-              value={relatoFinal} onChange={e => setRelatoFinal(e.target.value)}
-              placeholder="O que foi tratado? Quais foram os encaminhamentos? Próximos passos?..."
-              rows={4}
-              style={{ ...inpStyle, resize:"vertical", marginBottom:10,
-                border: "1.5px solid " + (relatoFinal.trim() ? "#DCDDDE" : "#ef4444") }}
-            />
-            {!relatoFinal.trim() && (
-              <div style={{ fontSize:11, color:"#ef4444", marginBottom:8 }}>Preencha o relato para confirmar.</div>
-            )}
-            <div style={{ display:"flex", gap:8 }}>
-              <button onClick={() => concluirReuniao(r.id, statusPendente)}
-                disabled={!relatoFinal.trim()}
-                style={{ ...btnBase,
-                  background: statusPendente === "Realizada" ? "#22c55e" : "#ef4444",
-                  color:"#fff",
-                  opacity: relatoFinal.trim() ? 1 : 0.4,
-                  cursor: relatoFinal.trim() ? "pointer" : "not-allowed" }}>
-                💾 Confirmar
-              </button>
-              <button onClick={() => { setConcluindo(null); setStatusPendente(null); setRelatoFinal(""); }}
-                style={{ ...btnBase, background:"#e5e7eb", color:"#555" }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div style={{ fontFamily:fontB }}>
@@ -1451,7 +1454,11 @@ function ReuniaoTab({ escola, autor, onSave }) {
           <div style={{ fontSize:12, fontWeight:700, color:"#f59e0b", textTransform:"uppercase", letterSpacing:1, marginBottom:8 }}>
             Próximas ({agendadas.length})
           </div>
-          {agendadas.map(r => <CardReuniao key={r.id} r={r} />)}
+          {agendadas.map(r => <CardReuniao key={r.id} r={r}
+              concluindo={concluindo} setConcluindo={setConcluindo}
+              statusPendente={statusPendente} setStatusPendente={setStatusPendente}
+              relatoFinal={relatoFinal} setRelatoFinal={setRelatoFinal}
+              concluirReuniao={concluirReuniao} />)}
         </div>
       )}
 
@@ -1461,7 +1468,11 @@ function ReuniaoTab({ escola, autor, onSave }) {
           <div style={{ fontSize:12, fontWeight:700, color:"#888", textTransform:"uppercase", letterSpacing:1, marginBottom:8 }}>
             Histórico ({passadas.length})
           </div>
-          {passadas.map(r => <CardReuniao key={r.id} r={r} />)}
+          {passadas.map(r => <CardReuniao key={r.id} r={r}
+              concluindo={concluindo} setConcluindo={setConcluindo}
+              statusPendente={statusPendente} setStatusPendente={setStatusPendente}
+              relatoFinal={relatoFinal} setRelatoFinal={setRelatoFinal}
+              concluirReuniao={concluirReuniao} />)}
         </div>
       )}
 
