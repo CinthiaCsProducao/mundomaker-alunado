@@ -1569,7 +1569,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
       {key:"cnpj",label:"CNPJ"},{key:"razao",label:"Razão Social",full:true},{key:"respLegal",label:"Resp. Legal",full:true},
     ]},
     { key:"endereco", label:"Endereço", fields:[
-      {key:"logradouro",label:"Logradouro",full:true},{key:"bairro",label:"Bairro"},{key:"cidade",label:"Cidade"},
+      {key:"logradouro",label:"Logradouro",full:true},{key:"numero",label:"Número"},{key:"bairro",label:"Bairro"},{key:"cidade",label:"Cidade"},
       {key:"uf",label:"UF"},{key:"cep",label:"CEP"},
     ]},
     { key:"contato", label:"Contato", fields:[
