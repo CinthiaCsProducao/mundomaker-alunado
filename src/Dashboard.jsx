@@ -1821,7 +1821,6 @@ export default function Dashboard() {
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <LogoMM size={60} cor="#111" />
           <div style={{ fontSize: 22, fontWeight: 800, color: "#111", marginTop: 8 }}>Mundo Maker</div>
-          <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>Dashboard de Alunado</div>
         </div>
 
         {/* ── Login normal ── */}
