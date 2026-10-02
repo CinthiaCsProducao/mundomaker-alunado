@@ -377,7 +377,7 @@ export function ManifestView({ manifest, onBack }: ManifestViewProps) {
 
   const handleDownloadPDF = async () => {
     if (currentAudit.errors.length > 0) {
-      const proceed = confirm(`ATENÇÃO - AUDITORIA LOGÍSTICA:\n\nO romaneio possui os seguintes apontamentos:\n${currentAudit.errors.map(e => `• ${e}`).join('\n')}\n\nDeseja prosseguir com o download do PDF mesmo assim?`);
+      const proceed = window.confirm(`ATENÇÃO - AUDITORIA LOGÍSTICA:\n\nO romaneio possui os seguintes apontamentos:\n${currentAudit.errors.map(e => `• ${e}`).join('\n')}\n\nDeseja prosseguir com o download do PDF mesmo assim?`);
       if (!proceed) return;
     }
     const element = document.getElementById('printable-area');
@@ -597,7 +597,7 @@ export function ManifestView({ manifest, onBack }: ManifestViewProps) {
    */
   const handleDownloadExcel = async () => {
     if (currentAudit.errors.length > 0) {
-      const proceed = confirm(`ATENÇÃO - AUDITORIA LOGÍSTICA:\n\nO romaneio possui os seguintes apontamentos:\n${currentAudit.errors.map(e => `• ${e}`).join('\n')}\n\nDeseja prosseguir com a exportação para Excel mesmo assim?`);
+      const proceed = window.confirm(`ATENÇÃO - AUDITORIA LOGÍSTICA:\n\nO romaneio possui os seguintes apontamentos:\n${currentAudit.errors.map(e => `• ${e}`).join('\n')}\n\nDeseja prosseguir com a exportação para Excel mesmo assim?`);
       if (!proceed) return;
     }
     try {
@@ -629,7 +629,7 @@ export function ManifestView({ manifest, onBack }: ManifestViewProps) {
 
   const handleDownloadCSV = () => {
     if (currentAudit.errors.length > 0) {
-      const proceed = confirm(`ATENÇÃO - AUDITORIA LOGÍSTICA:\n\nO romaneio possui os seguintes apontamentos:\n${currentAudit.errors.map(e => `• ${e}`).join('\n')}\n\nDeseja prosseguir com a exportação para CSV mesmo assim?`);
+      const proceed = window.confirm(`ATENÇÃO - AUDITORIA LOGÍSTICA:\n\nO romaneio possui os seguintes apontamentos:\n${currentAudit.errors.map(e => `• ${e}`).join('\n')}\n\nDeseja prosseguir com a exportação para CSV mesmo assim?`);
       if (!proceed) return;
     }
 
