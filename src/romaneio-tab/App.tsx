@@ -25,7 +25,15 @@ import { format } from 'date-fns';
 /** Uma carga pode virar um romaneio ou dois — ver `saiEmDuasRemessas`. */
 type Remessa = { rotulo: 'Aluno' | 'Professor'; manifest: Manifest };
 
-export default function App() {
+/** [MODIFICADO NO MUNDO MAKER] Dados entregues ao sistema de fora ao fechar um romaneio. */
+export type RomaneioFechado = {
+  manifest: Manifest;
+  rotulo: 'Aluno' | 'Professor';
+  pdf: Blob;
+  xlsx: Blob;
+};
+
+export default function App({ onFecharRomaneio }: { onFecharRomaneio?: (dados: RomaneioFechado) => Promise<void> | void }) {
   const [remessas, setRemessas] = useState<Remessa[] | null>(null);
   const [atual, setAtual] = useState(0);
   const [aviso, setAviso] = useState<string[]>([]);
@@ -58,6 +66,17 @@ export default function App() {
   };
 
   const voltar = () => { setRemessas(null); setAviso([]); setAtual(0); };
+
+  /** [MODIFICADO NO MUNDO MAKER] Salva no histórico e tira a remessa fechada da tela. */
+  const fecharRemessa = async (dados: { manifest: Manifest; pdf: Blob; xlsx: Blob }) => {
+    if (!remessas || !onFecharRomaneio) return;
+    const { rotulo } = remessas[atual];
+    await onFecharRomaneio({ ...dados, rotulo });
+    const restantes = remessas.filter((_, i) => i !== atual);
+    if (restantes.length === 0) { voltar(); return; }
+    setRemessas(restantes);
+    setAtual(0);
+  };
 
   if (remessas) {
     const { rotulo, manifest } = remessas[atual];
@@ -98,7 +117,7 @@ export default function App() {
             para a outra. Fica no Fragment porque o componente não é React.FC e
             não declara `key` nas suas props. */}
         <React.Fragment key={rotulo}>
-          <ManifestView manifest={manifest} onBack={voltar} />
+          <ManifestView manifest={manifest} onBack={voltar} onFechar={onFecharRomaneio ? fecharRemessa : undefined} />
         </React.Fragment>
       </div>
     );

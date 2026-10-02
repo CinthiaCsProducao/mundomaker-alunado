@@ -4,6 +4,7 @@ import BaseEscolas from "./BaseEscolas";
 import GerenciarUsuarios from "./GerenciarUsuarios";
 import CortesDashboard from "./CortesDashboard";
 import RomaneioTab from "./romaneio-tab";
+import HistoricoRomaneios from "./HistoricoRomaneios";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -1787,6 +1788,35 @@ export default function Dashboard() {
     }
   }
 
+  // Salva o romaneio fechado (PDF + Excel + dados) no histórico
+  async function salvarRomaneioFechado({ manifest, rotulo, pdf, xlsx }) {
+    const base = `${Date.now()}_${(manifest.schoolName || "Escola").replace(/[^a-zA-Z0-9_-]/g, "_")}_${rotulo}`;
+    const pdfPath = `${base}.pdf`;
+    const xlsxPath = `${base}.xlsx`;
+
+    const up1 = await supabase.storage.from("romaneios").upload(pdfPath, pdf, { contentType: "application/pdf" });
+    if (up1.error) throw new Error("Falha ao salvar o PDF: " + up1.error.message);
+    const up2 = await supabase.storage.from("romaneios").upload(xlsxPath, xlsx, {
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    if (up2.error) throw new Error("Falha ao salvar o Excel: " + up2.error.message);
+
+    const { error } = await supabase.from("romaneios_historico").insert({
+      escola:        manifest.schoolName || "Escola",
+      linha:         manifest.linha || null,
+      remessa:       rotulo,
+      data_romaneio: manifest.date || null,
+      total_volumes: manifest.summary?.totalVolumes ?? manifest.volumes?.length ?? null,
+      peso_total:    manifest.summary?.totalWeight ?? null,
+      pdf_path:      pdfPath,
+      xlsx_path:     xlsxPath,
+      manifest:      manifest,
+      criado_por:    equipeLogada?.equipe || null,
+    });
+    if (error) throw new Error("Falha ao registrar no histórico: " + error.message);
+    alert("Romaneio fechado e salvo no histórico!");
+  }
+
   async function handleDelete(schoolId) {
     await supabase.from("schools").delete().eq("id", schoolId);
     setEscolaSelecionada(null);
@@ -2006,6 +2036,10 @@ export default function Dashboard() {
             style={{ background: view === "romaneio" ? "#000" : "rgba(0,0,0,0.12)", color: view === "romaneio" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
             Romaneio
           </button>
+          <button onClick={() => setView(view === "histromaneios" ? "dashboard" : "histromaneios")}
+            style={{ background: view === "histromaneios" ? "#000" : "rgba(0,0,0,0.12)", color: view === "histromaneios" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+            Hist. Romaneios
+          </button>
           {isAdmin && (
             <button onClick={() => setView(view === "usuarios" ? "dashboard" : "usuarios")}
               style={{ background: view === "usuarios" ? "#000" : "rgba(0,0,0,0.12)", color: view === "usuarios" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
@@ -2059,9 +2093,13 @@ export default function Dashboard() {
             </button>
           </div>
           <div style={{ flex: 1, overflow: "hidden" }}>
-            <RomaneioTab altura="calc(100vh - 41px)" />
+            <RomaneioTab altura="calc(100vh - 41px)" onFecharRomaneio={salvarRomaneioFechado} />
           </div>
         </div>
+      )}
+
+      {view === "histromaneios" && (
+        <HistoricoRomaneios onVoltar={() => setView("dashboard")} />
       )}
 
       {view === "usuarios" && (

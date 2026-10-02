@@ -4,7 +4,7 @@
  * Mudança aqui some na próxima geração. Mude lá e gere de novo.
  */
 import React, { useLayoutEffect, useRef, useState } from 'react';
-import App from './App';
+import App, { RomaneioFechado } from './App';
 import { definirRaizDoTema, temaSalvo } from './lib/tema';
 import './romaneio-tab.css';
 
@@ -17,7 +17,7 @@ import './romaneio-tab.css';
  * (100vh); dentro de um painel com cabeçalho, passe o que sobra, por exemplo
  * `altura="calc(100vh - 64px)"`.
  */
-export default function RomaneioTab({ altura = '100vh' }: { altura?: string }) {
+export default function RomaneioTab({ altura = '100vh', onFecharRomaneio }: { altura?: string; onFecharRomaneio?: (dados: RomaneioFechado) => Promise<void> | void }) {
   const caixa = useRef<HTMLDivElement>(null);
   // Lido UMA vez, no primeiro render: a aba já nasce no tema certo, sem piscar.
   const [temaInicial] = useState(temaSalvo);
@@ -34,7 +34,7 @@ export default function RomaneioTab({ altura = '100vh' }: { altura?: string }) {
       data-tema={temaInicial}
       style={{ ['--romaneio-altura' as string]: altura, height: altura, overflow: 'auto' } as React.CSSProperties}
     >
-      <App />
+      <App onFecharRomaneio={onFecharRomaneio} />
     </div>
   );
 }

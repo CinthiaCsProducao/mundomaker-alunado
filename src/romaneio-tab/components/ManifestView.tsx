@@ -43,9 +43,11 @@ function trocarProjeto(nomeCompleto: string, novoProjeto: string): string {
 interface ManifestViewProps {
   manifest: Manifest;
   onBack: () => void;
+  /** [MODIFICADO NO MUNDO MAKER] Chamado ao fechar o romaneio, com o documento pronto. */
+  onFechar?: (dados: { manifest: Manifest; pdf: Blob; xlsx: Blob }) => Promise<void> | void;
 }
 
-export function ManifestView({ manifest, onBack }: ManifestViewProps) {
+export function ManifestView({ manifest, onBack, onFechar }: ManifestViewProps) {
   const [editableManifest, setEditableManifest] = useState<Manifest>(() => {
     const copy = JSON.parse(JSON.stringify(manifest));
     copy.volumes = copy.volumes.map((vol: any, vIdx: number) => ({
@@ -375,8 +377,8 @@ export function ManifestView({ manifest, onBack }: ManifestViewProps) {
     printWindow.document.close();
   };
 
-  const handleDownloadPDF = async () => {
-    if (currentAudit.errors.length > 0) {
+  const handleDownloadPDF = async (retornarBlob: boolean = false): Promise<Blob | undefined> => {
+    if (!retornarBlob && currentAudit.errors.length > 0) {
       const proceed = window.confirm(`ATENÇÃO - AUDITORIA LOGÍSTICA:\n\nO romaneio possui os seguintes apontamentos:\n${currentAudit.errors.map(e => `• ${e}`).join('\n')}\n\nDeseja prosseguir com o download do PDF mesmo assim?`);
       if (!proceed) return;
     }
@@ -485,13 +487,45 @@ export function ManifestView({ manifest, onBack }: ManifestViewProps) {
         }
       }
 
+      if (retornarBlob) return pdf.output('blob') as Blob;
       pdf.save(`Romaneio_${editableManifest.schoolName}_${editableManifest.date}.pdf`.replace(/\s+/g, '_'));
 
     } catch (err) {
       console.error("PDF generation failed:", err);
       alert(`Erro ao gerar PDF: ${err instanceof Error ? err.message : String(err)}`);
+      if (retornarBlob) throw err;
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  /**
+   * [MODIFICADO NO MUNDO MAKER] Fecha o romaneio: gera PDF e Excel prontos e
+   * entrega ao sistema de fora (que guarda no histórico).
+   */
+  const [fechando, setFechando] = useState(false);
+  const handleFechar = async () => {
+    if (!onFechar || fechando) return;
+    if (currentAudit.errors.length > 0) {
+      const proceed = window.confirm(`ATENÇÃO - AUDITORIA LOGÍSTICA:\n\nO romaneio possui os seguintes apontamentos:\n${currentAudit.errors.map(e => `• ${e}`).join('\n')}\n\nDeseja fechar o romaneio mesmo assim?`);
+      if (!proceed) return;
+    } else if (!window.confirm('Fechar este romaneio e salvar no histórico?')) {
+      return;
+    }
+    setFechando(true);
+    try {
+      const pdf = await handleDownloadPDF(true);
+      if (!pdf) throw new Error('Não foi possível gerar o PDF.');
+      const { montarWorkbook } = await import('../lib/exportXlsx');
+      const workbook = await montarWorkbook(editableManifest);
+      const buffer = await workbook.xlsx.writeBuffer();
+      const xlsx = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      await onFechar({ manifest: editableManifest, pdf, xlsx });
+    } catch (e: any) {
+      console.error(e);
+      alert('Erro ao fechar o romaneio: ' + (e?.message || e));
+    } finally {
+      setFechando(false);
     }
   };
 
@@ -783,7 +817,7 @@ export function ManifestView({ manifest, onBack }: ManifestViewProps) {
                 CSV
               </button>
               <button
-                onClick={handleDownloadPDF}
+                onClick={() => handleDownloadPDF()}
                 disabled={isGenerating}
                 className="flex items-center gap-2 px-3 text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ height: 32, background: 'transparent', border: '1px solid var(--color-c-line-2)', color: 'var(--color-c-dim)', cursor: 'pointer' }}
@@ -799,6 +833,18 @@ export function ManifestView({ manifest, onBack }: ManifestViewProps) {
                 <Printer className="w-4 h-4" />
                 Imprimir
               </button>
+              {onFechar && (
+                <button
+                  onClick={handleFechar}
+                  disabled={fechando || isGenerating}
+                  className="flex items-center gap-2 px-3 text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ height: 32, background: '#e53935', border: 'none', color: '#fff', cursor: 'pointer' }}
+                  title="Fecha o romaneio e salva PDF + Excel no histórico"
+                >
+                  {fechando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                  {fechando ? 'Fechando...' : 'Fechar romaneio'}
+                </button>
+              )}
             </div>
           </div>
         </div>
