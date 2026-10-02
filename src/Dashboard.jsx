@@ -288,11 +288,16 @@ function gerarPDFCiclo(ciclo) {
 function ModalEncerrarCiclo({ cicloAtivo, totalAlunos, totalEscolas, escolas, onConfirmar, onClose }) {
   const [nome, setNome] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [qtdRomaneios, setQtdRomaneios] = useState(null);
 
   useEffect(() => {
     const now = new Date();
     const semestre = now.getMonth() < 6 ? "1" : "2";
     setNome(`Ciclo ${semestre}S ${now.getFullYear()}`);
+    supabase.from("romaneios_historico")
+      .select("id", { count: "exact", head: true })
+      .is("ciclo_nome", null)
+      .then(({ count }) => setQtdRomaneios(count ?? 0));
   }, []);
 
   const porCluster = ["Diamond", "Gold", "Silver", "Bronze"].map(c => ({
@@ -330,6 +335,11 @@ function ModalEncerrarCiclo({ cicloAtivo, totalAlunos, totalEscolas, escolas, on
               <div style={{ fontSize: 10, color: "#888", textTransform: "uppercase", marginTop: 4 }}>Escolas Cadastradas</div>
             </div>
           </div>
+          {qtdRomaneios != null && (
+            <div style={{ fontSize: 12, color: "#555", marginBottom: 10, fontWeight: 600 }}>
+              Romaneios fechados neste ciclo: {qtdRomaneios}
+            </div>
+          )}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {porCluster.filter(c => c.count > 0).map(({ cluster, count, alunos }) => (
               <div key={cluster} style={{ background: CLUSTER_INFO[cluster].bg, color: CLUSTER_INFO[cluster].text, borderRadius: 6, padding: "5px 10px", fontSize: 11, fontWeight: 700 }}>
@@ -339,7 +349,7 @@ function ModalEncerrarCiclo({ cicloAtivo, totalAlunos, totalEscolas, escolas, on
           </div>
         </div>
         <div style={{ padding: "20px 28px" }}>
-          <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 8 }}>Nome do Ciclo</label>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 8 }}>Nome do Ciclo (vale para o Histórico de Ciclos e o de Romaneios)</label>
           <input
             value={nome}
             onChange={e => setNome(e.target.value)}
@@ -347,7 +357,7 @@ function ModalEncerrarCiclo({ cicloAtivo, totalAlunos, totalEscolas, escolas, on
             style={{ width: "100%", padding: "11px 14px", border: "2px solid #ddd", borderRadius: 6, fontSize: 14, fontFamily: font, boxSizing: "border-box", marginBottom: 14 }}
           />
           <div style={{ background: "#fff8e1", border: "1.5px solid #FFD902", borderRadius: 6, padding: "12px 16px", marginBottom: 20, fontSize: 12, color: "#7a6000", lineHeight: 1.5 }}>
-            Apos encerrar, os dados serao arquivados no historico e os contadores zerados para um novo ciclo. Esta acao nao pode ser desfeita.
+            Apos encerrar, as escolas, os cortes e os romaneios deste ciclo serao arquivados com esse nome, e os formularios e contadores zerados para um novo ciclo. Esta acao nao pode ser desfeita.
           </div>
           <div style={{ display: "flex", gap: 12 }}>
             <button onClick={onClose} style={{ flex: 1, padding: "12px", background: "#f0f0f0", color: "#333", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
@@ -1771,6 +1781,11 @@ export default function Dashboard() {
         cortes_snapshot:   cortesSnap || [],
       }).eq("id", cicloAtivo.id);
 
+      // Arquiva os romaneios em aberto com o mesmo nome do ciclo
+      await supabase.from("romaneios_historico")
+        .update({ ciclo_nome: nomeCiclo })
+        .is("ciclo_nome", null);
+
       // Zera alunos de todas as turmas para o novo ciclo
       await supabase.from("classes").update({ num_alunos: 0 }).gte("num_alunos", 0);
       // Limpa histórico para zerar contadores do dashboard
@@ -1812,6 +1827,8 @@ export default function Dashboard() {
       xlsx_path:     xlsxPath,
       manifest:      manifest,
       criado_por:    equipeLogada?.equipe || null,
+      ciclo_id:      cicloAtivo?.id != null ? String(cicloAtivo.id) : null,
+      ciclo_nome:    null, // em aberto até o ciclo ser encerrado
     });
     if (error) throw new Error("Falha ao registrar no histórico: " + error.message);
     alert("Romaneio fechado e salvo no histórico!");

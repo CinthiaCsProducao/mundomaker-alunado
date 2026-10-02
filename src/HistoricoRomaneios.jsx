@@ -40,6 +40,7 @@ export default function HistoricoRomaneios({ onVoltar }) {
   const [busca, setBusca] = useState("");
   const [visualizando, setVisualizando] = useState(null);
   const [baixando, setBaixando] = useState("");
+  const [cicloSel, setCicloSel] = useState("__aberto__");
 
   async function carregar() {
     setCarregando(true);
@@ -55,15 +56,25 @@ export default function HistoricoRomaneios({ onVoltar }) {
 
   useEffect(() => { carregar(); }, []);
 
+  const ciclos = useMemo(
+    () => [...new Set(lista.map(r => r.ciclo_nome).filter(Boolean))],
+    [lista]
+  );
+
   const filtrada = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    if (!q) return lista;
-    return lista.filter(r =>
-      (r.escola || "").toLowerCase().includes(q) ||
-      (r.data_romaneio || "").includes(q) ||
-      (r.remessa || "").toLowerCase().includes(q)
-    );
-  }, [lista, busca]);
+    return lista.filter(r => {
+      const doCiclo =
+        cicloSel === "__todos__" ? true :
+        cicloSel === "__aberto__" ? !r.ciclo_nome :
+        r.ciclo_nome === cicloSel;
+      if (!doCiclo) return false;
+      if (!q) return true;
+      return (r.escola || "").toLowerCase().includes(q) ||
+        (r.data_romaneio || "").includes(q) ||
+        (r.remessa || "").toLowerCase().includes(q);
+    });
+  }, [lista, busca, cicloSel]);
 
   async function handleBaixar(r, tipo) {
     const path = tipo === "pdf" ? r.pdf_path : r.xlsx_path;
@@ -94,6 +105,15 @@ export default function HistoricoRomaneios({ onVoltar }) {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
         <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>Histórico de Romaneios</h2>
+        <select
+          value={cicloSel}
+          onChange={e => setCicloSel(e.target.value)}
+          style={{ padding: "8px 12px", border: "1px solid #ccc", borderRadius: 6, fontSize: 13, fontFamily: font, fontWeight: 700 }}
+        >
+          <option value="__aberto__">Ciclo atual (em aberto)</option>
+          {ciclos.map(c => <option key={c} value={c}>{c}</option>)}
+          <option value="__todos__">Todos os ciclos</option>
+        </select>
         <input
           value={busca}
           onChange={e => setBusca(e.target.value)}
@@ -108,14 +128,16 @@ export default function HistoricoRomaneios({ onVoltar }) {
         <div style={{ textAlign: "center", padding: 48, color: "#666" }}>Carregando...</div>
       ) : filtrada.length === 0 ? (
         <div style={{ textAlign: "center", padding: 48, color: "#888", background: "#fff", borderRadius: 8 }}>
-          {lista.length === 0 ? "Nenhum romaneio fechado ainda. Feche um romaneio na aba Romaneio para ele aparecer aqui." : "Nada encontrado para essa busca."}
+          {cicloSel === "__aberto__" && !busca
+            ? "Nenhum romaneio fechado no ciclo atual. Feche um romaneio na aba Romaneio para ele aparecer aqui."
+            : "Nada encontrado para esse filtro."}
         </div>
       ) : (
         <div style={{ background: "#fff", borderRadius: 8, boxShadow: "0 2px 8px rgba(0,0,0,.07)", overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#111", color: "#fff", textAlign: "left" }}>
-                {["Data", "Escola", "Linha", "Remessa", "Volumes", "Peso (kg)", "Fechado por", "Ações"].map(h => (
+                {["Data", "Ciclo", "Escola", "Linha", "Remessa", "Volumes", "Peso (kg)", "Fechado por", "Ações"].map(h => (
                   <th key={h} style={{ padding: "10px 12px", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>{h}</th>
                 ))}
               </tr>
@@ -124,6 +146,7 @@ export default function HistoricoRomaneios({ onVoltar }) {
               {filtrada.map(r => (
                 <tr key={r.id} style={{ borderBottom: "1px solid #eee" }}>
                   <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>{r.data_romaneio}</td>
+                  <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>{r.ciclo_nome || <span style={{ color: "#1b8f3a", fontWeight: 700 }}>Em aberto</span>}</td>
                   <td style={{ padding: "10px 12px", fontWeight: 700 }}>{r.escola}</td>
                   <td style={{ padding: "10px 12px" }}>{r.linha || "—"}</td>
                   <td style={{ padding: "10px 12px" }}>{r.remessa}</td>

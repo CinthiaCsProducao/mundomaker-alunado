@@ -13,8 +13,14 @@ CREATE TABLE IF NOT EXISTS romaneios_historico (
   xlsx_path     text,
   manifest      jsonb,
   criado_por    text,
-  criado_em     timestamptz DEFAULT now()
+  criado_em     timestamptz DEFAULT now(),
+  ciclo_id      text,
+  ciclo_nome    text   -- NULL = ciclo em aberto; preenchido ao encerrar o ciclo
 );
+
+-- Se a tabela já existia (rodou a versão anterior), adiciona as colunas de ciclo:
+ALTER TABLE romaneios_historico ADD COLUMN IF NOT EXISTS ciclo_id   text;
+ALTER TABLE romaneios_historico ADD COLUMN IF NOT EXISTS ciclo_nome text;
 
 ALTER TABLE romaneios_historico DISABLE ROW LEVEL SECURITY;
 
