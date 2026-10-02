@@ -1755,12 +1755,18 @@ export default function Dashboard() {
   async function encerrarCiclo(nomeCiclo) {
     if (!cicloAtivo) return;
     try {
+      // Busca snapshot dos cortes para salvar junto ao ciclo
+      const { data: cortesSnap } = await supabase
+        .from("cortes_conferencia")
+        .select("*");
+
       await supabase.from("ciclos").update({
         nome:              nomeCiclo,
         data_encerramento: new Date().toISOString(),
         total_alunos:      totalAlunos,
         total_escolas:     totalEscolas,
         snapshot:          escolas,
+        cortes_snapshot:   cortesSnap || [],
       }).eq("id", cicloAtivo.id);
 
       // Zera alunos de todas as turmas para o novo ciclo
