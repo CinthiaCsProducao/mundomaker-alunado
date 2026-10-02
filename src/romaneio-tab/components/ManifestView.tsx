@@ -649,13 +649,13 @@ export function ManifestView({ manifest, onBack }: ManifestViewProps) {
             String(vol.volumeNumber),
             vol.type,
             vol.dimensions,
-            item.productName,
+            item.product.name,
             item.destination || 'Aluno',
-            item.type,
+            item.product.type,
             String(item.quantity),
-            typeof item.weight === 'number' ? item.weight.toFixed(3).replace('.', ',') : String(item.weight),
-            item.sequence || '1/1',
-            item.relation || '1x Aluno',
+            typeof item.totalWeight === 'number' ? item.totalWeight.toFixed(3).replace('.', ',') : String(item.totalWeight),
+            '',
+            formatarRelacao(item.product.ratio, item.destination || vol.category),
             ''
           ]);
         });
