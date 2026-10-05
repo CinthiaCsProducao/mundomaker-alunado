@@ -902,7 +902,7 @@ function InspiramakerDashboard({ onVoltar }) {
     async function carregar() {
       setLoading(true);
       const { data: schools } = await supabase.from("schools").select("*")
-        .eq("programa", "MakerLab Oficina").order("nome");
+        .in("programa", ["MakerLab Oficina", "MakerLab Oficina Inventores do Futuro"]).order("nome");
 
       const { data: histories } = await supabase.from("alunado_history")
         .select("school_id, data_submissao").order("data_submissao", { ascending: false });

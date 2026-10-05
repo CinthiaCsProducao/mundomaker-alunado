@@ -20,7 +20,7 @@ const CLUSTERS = [
 ];
 const CLUSTER_COLOR = Object.fromEntries(CLUSTERS);
 const STATUS_OPTS = ["Ativo", "Inativo"];
-const TIPO_OPTS = ["MakerLab", "MakerLab Class", "MakerLab Oficina", "TechLab"];
+const TIPO_OPTS = ["MakerLab", "MakerLab Class", "MakerLab Oficina", "TechLab", "MakerLab Oficina Inventores do Futuro"];
 const IDIOMA_OPTS = ["Português", "Inglês"];
 const PERIOD_OPTS = ["Semanal", "Quinzenal", "Mensal"];
 const SERIES_KEYS = ["ei","s1","s2","s3","s4","s5","s6","s7","s8","s9","em1","em2","em3"];

@@ -24,6 +24,8 @@ function calcularCluster(total) {
 function mapTipo(tipo) {
   if (!tipo) return "";
   const t = tipo.toLowerCase();
+  if (t.includes("inventores") && t.includes("oficina")) return "MakerLab Oficina Inventores do Futuro";
+  if (t.includes("inventores")) return "Inventores do Futuro";
   if (t.includes("oficina")) return "MakerLab Oficina";
   if (t.includes("class")) return "MakerLab Class";
   if (t.includes("techlab")) return "Inventores do Futuro";
@@ -558,7 +560,7 @@ export default function AlunadoForm() {
                   {modoLink && dadosGerais.programa
                     ? <div style={{ ...S.inputReadOnly, fontWeight:700 }}>{dadosGerais.programa}</div>
                     : <div style={{ display:"flex", flexWrap:"wrap", gap:10, marginTop:4 }}>
-                        {["MakerLab Class","MakerLab Oficina","Inventores do Futuro"].map(p => (
+                        {["MakerLab Class","MakerLab Oficina","MakerLab Oficina Inventores do Futuro","Inventores do Futuro"].map(p => (
                           <button key={p} type="button"
                             style={{ ...S.btn, ...(dadosGerais.programa===p?S.btnGreen:S.btnOutline), fontSize:13, padding:"10px 20px" }}
                             onClick={() => setDadosGerais({...dadosGerais,programa:p})}>
