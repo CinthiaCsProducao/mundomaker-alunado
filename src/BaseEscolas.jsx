@@ -37,7 +37,7 @@ function pendencias(s) {
   const divs = (s.divergencias||[]).filter(d=>!d.conferido);
   if (divs.length) items.push(`${divs.length} divergência(s) não conferida(s)`);
   const tot = SERIES_KEYS.filter(k=>!["em1","em2","em3"].includes(k)).reduce((a,k)=>a+(Number(s.series?.[k])||0),0);
-  if (s.totalInformado && tot !== Number(s.totalInformado)) items.push(`Total de alunos (${tot}) ≠ totalInformado (${s.totalInformado})`);
+  if (s.totalInformado && tot !== Number(s.totalInformado)) items.push(`Total de alunos (${tot}) ≠ total informado (${s.totalInformado})`);
   if (s.status==="Ativo" && s.validade && new Date(s.validade)<new Date()) items.push("Contrato vencido");
   if (s.status==="Ativo" && !s.cluster) items.push("Sem cluster");
   return items;
@@ -1580,15 +1580,15 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
 
   const LIST_CONFIGS = {
     contatos: {
-      label:"Contatos",
+      label:"Contatos", singular:"Contato",
       fields:[{key:"nome",label:"Nome"},{key:"cargo",label:"Cargo"},{key:"email",label:"E-mail"},{key:"telefone",label:"Telefone"},{key:"turma",label:"Turma"},{key:"fonte",label:"Fonte"}],
     },
     formacao: {
-      label:"Formação",
+      label:"Formação", singular:"Formação",
       fields:[{key:"ciclo",label:"Ciclo"},{key:"docente",label:"Docente"},{key:"cargo",label:"Cargo"},{key:"data",label:"Data",type:"date"}],
     },
     observacoes: {
-      label:"Histórico",
+      label:"Histórico", singular:"Histórico",
       fields:[{key:"data",label:"Data",type:"date"},{key:"texto",label:"Texto",type:"textarea",full:true}],
     },
   };
@@ -1641,7 +1641,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
         items={items}
         fields={cfg.fields}
         canWrite={true}
-        onAdd={()=>setModal({title:`Adicionar ${cfg.label.slice(0,-1)}`,fields:cfg.fields,values:{},section:key,listAdd:true})}
+        onAdd={()=>setModal({title:`Adicionar ${cfg.singular || cfg.label}`,fields:cfg.fields,values:{},section:key,listAdd:true})}
         onEdit={i=>setModal({title:`Editar`,fields:cfg.fields,values:items[i],section:key,listEdit:i})}
         onRemove={i=>setConfirm({msg:`Remover este item?`,onConfirm:async()=>{
           const newItems=[...items]; newItems.splice(i,1);

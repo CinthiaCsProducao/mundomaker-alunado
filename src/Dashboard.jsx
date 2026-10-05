@@ -123,7 +123,7 @@ function gerarPDF(escola, detalhes, hist) {
     </head><body>
     <button class="print-btn" onclick="window.print()">Imprimir / Salvar como PDF</button>
     <div class="header">
-      <h1>Mundo Maker — Formulario de Alunado</h1>
+      <h1>Mundo Maker — Formulário de Alunado</h1>
       <p>Enviado em: ${new Date(escola.data_submissao).toLocaleDateString("pt-BR")}</p>
     </div>
     <div class="section">
@@ -131,12 +131,12 @@ function gerarPDF(escola, detalhes, hist) {
       <div class="sec-body">
         <div class="grid">
           <div><div class="f-label">Nome</div><div class="f-val">${escola.nome}</div></div>
-          <div><div class="f-label">Responsavel</div><div class="f-val">${escola.responsavel_escola || "—"}</div></div>
+          <div><div class="f-label">Responsável</div><div class="f-val">${escola.responsavel_escola || "—"}</div></div>
           <div><div class="f-label">Telefone</div><div class="f-val">${escola.telefone || "—"}</div></div>
           <div><div class="f-label">CEP</div><div class="f-val">${escola.cep || "—"}</div></div>
-          <div style="grid-column:1/-1"><div class="f-label">Endereco</div><div class="f-val">${enderecoCompleto}</div></div>
+          <div style="grid-column:1/-1"><div class="f-label">Endereço</div><div class="f-val">${enderecoCompleto}</div></div>
           <div><div class="f-label">Tipo de Frete</div><div class="f-val">${escola.tipo_frete || "—"}</div></div>
-          <div><div class="f-label">Inicio das Aulas</div><div class="f-val">${fmtDate(escola.data_inicio)}</div></div>
+          <div><div class="f-label">Início das Aulas</div><div class="f-val">${fmtDate(escola.data_inicio)}</div></div>
           <div><div class="f-label">Recebimento do Material</div><div class="f-val">${fmtDate(escola.data_recebimento)}</div></div>
         </div>
       </div>
@@ -151,10 +151,10 @@ function gerarPDF(escola, detalhes, hist) {
       </div>
     </div>
     <div class="section">
-      <div class="sec-title">3. Series e Turmas</div>
+      <div class="sec-title">3. Séries e Turmas</div>
       <div class="sec-body">
         <table>
-          <thead><tr><th>Serie / Turma</th><th>Alunos</th><th>Professor Maker</th></tr></thead>
+          <thead><tr><th>Série / Turma</th><th>Alunos</th><th>Professor Maker</th></tr></thead>
           <tbody>${seriesHtml}</tbody>
         </table>
         <div class="total-box">
@@ -165,7 +165,7 @@ function gerarPDF(escola, detalhes, hist) {
     </div>
     ${hist ? `
     <div class="section">
-      <div class="sec-title">4. Responsavel pelo Preenchimento</div>
+      <div class="sec-title">4. Responsável pelo Preenchimento</div>
       <div class="sec-body">
         <div><div class="f-label">Nome</div><div class="f-val">${hist.responsavel_preenchimento || "—"}</div></div>
         ${hist.assinatura_url ? `<div style="margin-top:12px;"><div class="f-label">Assinatura</div><img class="sig-img" src="${hist.assinatura_url}" /></div>` : ""}
@@ -174,10 +174,10 @@ function gerarPDF(escola, detalhes, hist) {
     ` : ""}
     ${hist && hist.calendario_url ? `
     <div class="section">
-      <div class="sec-title">5. Calendario Escolar</div>
+      <div class="sec-title">5. Calendário Escolar</div>
       <div class="sec-body">
         <div class="f-label">Arquivo Anexado</div>
-        <div class="f-val" style="margin-top:4px;">${hist.calendario_nome || "Calendario"}</div>
+        <div class="f-val" style="margin-top:4px;">${hist.calendario_nome || "Calendário"}</div>
         <a href="${hist.calendario_url}" target="_blank" style="display:inline-block;margin-top:8px;color:#0066cc;font-size:12px;">Abrir arquivo</a>
       </div>
     </div>
@@ -210,7 +210,7 @@ function gerarPDFCiclo(ciclo) {
   win.document.write(`
     <!DOCTYPE html><html><head>
     <meta charset="UTF-8">
-    <title>Relatorio — ${ciclo.nome}</title>
+    <title>Relatório —${ciclo.nome}</title>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body { font-family: Arial, sans-serif; font-size: 13px; color: #111; background: #fff; padding: 24px; max-width: 900px; margin: 0 auto; }
@@ -238,9 +238,9 @@ function gerarPDFCiclo(ciclo) {
     <button class="print-btn" onclick="window.print()">Imprimir / Salvar como PDF</button>
     <div class="header">
       <div>
-        <div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Mundo Maker — Relatorio de Ciclo</div>
+        <div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Mundo Maker — Relatório de Ciclo</div>
         <h1>${ciclo.nome}</h1>
-        <div class="sub">${fmtDate(ciclo.data_inicio)} ate ${fmtDate(ciclo.data_encerramento)}</div>
+        <div class="sub">${fmtDate(ciclo.data_inicio)} até ${fmtDate(ciclo.data_encerramento)}</div>
       </div>
       <div style="text-align:right;">
         <div style="font-size:11px;color:#aaa;">Total de escolas</div>
@@ -320,7 +320,7 @@ function ModalEncerrarCiclo({ cicloAtivo, totalAlunos, totalEscolas, escolas, on
         <div style={{ background: "#e53935", padding: "20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Encerrar Ciclo</div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", marginTop: 4 }}>Os dados serao salvos no historico e os contadores zerados</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", marginTop: 4 }}>Os dados serão salvos no histórico e os contadores zerados</div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.8)", fontSize: 22, cursor: "pointer", lineHeight: 1 }}>x</button>
         </div>
@@ -358,7 +358,7 @@ function ModalEncerrarCiclo({ cicloAtivo, totalAlunos, totalEscolas, escolas, on
             style={{ width: "100%", padding: "11px 14px", border: "2px solid #ddd", borderRadius: 6, fontSize: 14, fontFamily: font, boxSizing: "border-box", marginBottom: 14 }}
           />
           <div style={{ background: "#fff8e1", border: "1.5px solid #FFD902", borderRadius: 6, padding: "12px 16px", marginBottom: 20, fontSize: 12, color: "#7a6000", lineHeight: 1.5 }}>
-            Apos encerrar, as escolas, os cortes e os romaneios deste ciclo serao arquivados com esse nome, e os formularios e contadores zerados para um novo ciclo. Esta acao nao pode ser desfeita.
+            Após encerrar, as escolas, os cortes e os romaneios deste ciclo serão arquivados com esse nome, e os formulários e contadores zerados para um novo ciclo. Esta ação não pode ser desfeita.
           </div>
           <div style={{ display: "flex", gap: 12 }}>
             <button onClick={onClose} style={{ flex: 1, padding: "12px", background: "#f0f0f0", color: "#333", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
@@ -421,9 +421,9 @@ function ModalEscolaHistorico({ escola, onClose }) {
 
         <div style={{ padding: "16px 24px" }}>
           {loading ? (
-            <div style={{ textAlign: "center", padding: 40, color: "#aaa" }}>Carregando formularios...</div>
+            <div style={{ textAlign: "center", padding: 40, color: "#aaa" }}>Carregando formulários...</div>
           ) : envios.length === 0 ? (
-            <div style={{ textAlign: "center", padding: 40, color: "#aaa" }}>Nenhum formulario encontrado.</div>
+            <div style={{ textAlign: "center", padding: 40, color: "#aaa" }}>Nenhum formulário encontrado.</div>
           ) : (
             <div style={{ display: "grid", gap: 14 }}>
               {envios.map((env, idx) => {
@@ -449,12 +449,12 @@ function ModalEscolaHistorico({ escola, onClose }) {
                         {env.calendario_url && (
                           <a href={env.calendario_url} target="_blank" rel="noreferrer"
                             style={{ background: "#00C7F4", color: "#000", border: "none", borderRadius: 4, padding: "6px 12px", fontSize: 11, fontWeight: 700, fontFamily: font, cursor: "pointer", textDecoration: "none" }}>
-                            Calendario
+                            Calendário
                           </a>
                         )}
                         <button onClick={() => setEnvioSelecionado(expanded ? null : idx)}
                           style={{ background: "#111", color: "#fff", border: "none", borderRadius: 4, padding: "6px 12px", fontSize: 11, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-                          {expanded ? "Fechar" : "Ver Series"}
+                          {expanded ? "Fechar" : "Ver Séries"}
                         </button>
                       </div>
                     </div>
@@ -607,7 +607,7 @@ function HistoricoCiclos({ ciclos, onVoltar }) {
         <button onClick={onVoltar} style={{ background: "none", border: "none", color: "#666", fontSize: 13, cursor: "pointer", fontFamily: font, padding: 0, marginBottom: 8, display: "block" }}>
           Voltar ao Dashboard
         </button>
-        <div style={{ fontSize: 26, fontWeight: 800, color: "#111" }}>Historico de Ciclos</div>
+        <div style={{ fontSize: 26, fontWeight: 800, color: "#111" }}>Histórico de Ciclos</div>
         <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>{ciclos.length} ciclo{ciclos.length !== 1 ? "s" : ""} encerrado{ciclos.length !== 1 ? "s" : ""}</div>
       </div>
 
@@ -615,18 +615,18 @@ function HistoricoCiclos({ ciclos, onVoltar }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 28 }}>
           <div style={{ background: "#111", borderRadius: 8, padding: "22px 28px" }}>
             <div style={{ fontSize: 44, fontWeight: 800, color: "#39DF18", lineHeight: 1 }}>{totalGeralAlunos.toLocaleString("pt-BR")}</div>
-            <div style={{ fontSize: 11, color: "#aaa", textTransform: "uppercase", marginTop: 6 }}>Total Historico de Alunos</div>
+            <div style={{ fontSize: 11, color: "#aaa", textTransform: "uppercase", marginTop: 6 }}>Total Histórico de Alunos</div>
           </div>
           <div style={{ background: "#fff", borderRadius: 8, padding: "22px 28px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
             <div style={{ fontSize: 44, fontWeight: 800, color: "#111", lineHeight: 1 }}>{totalGeralEscolas}</div>
-            <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", marginTop: 6 }}>Total Historico de Escolas</div>
+            <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", marginTop: 6 }}>Total Histórico de Escolas</div>
           </div>
         </div>
       )}
 
       {ciclos.length === 0 ? (
         <div style={{ background: "#fff", borderRadius: 8, padding: "60px 40px", textAlign: "center", color: "#aaa", fontSize: 15, boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
-          Nenhum ciclo encerrado ainda. Os ciclos aparecerao aqui apos serem finalizados.
+          Nenhum ciclo encerrado ainda. Os ciclos aparecerão aqui após serem finalizados.
         </div>
       ) : (
         <div style={{ display: "grid", gap: 16 }}>
@@ -776,7 +776,7 @@ function EscolasDashboard({ onVoltar }) {
             </div>
             <div style={{ background: "#fff", borderRadius: 8, padding: "22px 28px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
               <div style={{ fontSize: 44, fontWeight: 800, color: "#111", lineHeight: 1 }}>{escolas.length}</div>
-              <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", marginTop: 6 }}>Escolas Unicas</div>
+              <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", marginTop: 6 }}>Escolas Únicas</div>
             </div>
           </div>
 
@@ -784,7 +784,7 @@ function EscolasDashboard({ onVoltar }) {
             {SEGMENTOS.filter(s => s !== "Outros" || segTotais["Outros"] > 0).map(seg => (
               <div key={seg} style={{ background: "#fff", borderRadius: 8, padding: "16px 20px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", borderTop: `4px solid ${SEG_COLORS[seg]}` }}>
                 <div style={{ fontSize: 28, fontWeight: 800, color: "#111", lineHeight: 1 }}>{(segTotais[seg] || 0).toLocaleString("pt-BR")}</div>
-                <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", marginTop: 4, letterSpacing: 0.5 }}>{seg}</div>
+                <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", marginTop: 4, letterSpacing: 0.5 }}>{seg === "Ensino Medio" ? "Ensino Médio" : seg}</div>
               </div>
             ))}
           </div>
@@ -799,8 +799,8 @@ function EscolasDashboard({ onVoltar }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: "#f5f5f5" }}>
-                    {["Escola", "Cluster", "Total", "Infantil", "Fund. 1", "Fund. 2", "Ens. Medio", "Programa", ""].map(h => (
-                      <th key={h} style={{ padding: "9px 14px", textAlign: h === "Total" || h === "Infantil" || h === "Fund. 1" || h === "Fund. 2" || h === "Ens. Medio" ? "right" : "left", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
+                    {["Escola", "Cluster", "Total", "Infantil", "Fund. 1", "Fund. 2", "Ens. Médio", "Programa", ""].map(h => (
+                      <th key={h} style={{ padding: "9px 14px", textAlign: h === "Total" || h === "Infantil" || h === "Fund. 1" || h === "Fund. 2" || h === "Ens. Médio" ? "right" : "left", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -825,7 +825,7 @@ function EscolasDashboard({ onVoltar }) {
                       <td style={{ padding: "10px 14px" }}>
                         <button onClick={() => setEscolaSel(e)}
                           style={{ background: "#111", color: "#fff", border: "none", borderRadius: 4, padding: "5px 10px", fontSize: 11, fontWeight: 700, fontFamily: font, cursor: "pointer", whiteSpace: "nowrap" }}>
-                          Formularios
+                          Formulários
                         </button>
                       </td>
                     </tr>
@@ -1151,7 +1151,7 @@ function InspiramakerDashboard({ onVoltar }) {
 
           <div style={{ background: "#fff", borderRadius: 8, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", overflow: "hidden" }}>
             <div style={{ background: "#111", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: 1.5 }}>Tabela de Producao</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: 1.5 }}>Tabela de Produção</div>
               <div style={{ display: "flex", gap: 10 }}>
                 <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar escola..."
                   style={{ padding: "7px 12px", borderRadius: 4, border: "none", fontSize: 13, fontFamily: font, width: 200 }} />
@@ -1322,14 +1322,14 @@ function ModalDetalhes({ escola, onClose, onDelete, isAdmin }) {
         <div style={{ padding: "20px 28px", borderBottom: "1px solid #f0f0f0" }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: 1, marginBottom: 14 }}>Dados da Escola</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px", fontSize: 13 }}>
-            <div><div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Responsavel</div><div style={{ fontWeight: 600, color: "#222", marginTop: 2 }}>{escola.responsavel_escola || "—"}</div></div>
+            <div><div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Responsável</div><div style={{ fontWeight: 600, color: "#222", marginTop: 2 }}>{escola.responsavel_escola || "—"}</div></div>
             <div><div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Telefone</div><div style={{ fontWeight: 600, color: "#222", marginTop: 2 }}>{escola.telefone || "—"}</div></div>
             <div style={{ gridColumn: "1 / -1" }}>
-              <div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Endereco</div>
+              <div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Endereço</div>
               <div style={{ fontWeight: 600, color: "#222", marginTop: 2 }}>{enderecoLinhas.length > 0 ? enderecoLinhas.join(" · ") : (escola.endereco || "—")}</div>
             </div>
             <div><div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Tipo de Frete</div><div style={{ fontWeight: 600, color: "#222", marginTop: 2 }}>{escola.tipo_frete || "—"}</div></div>
-            <div><div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Inicio das Aulas</div><div style={{ fontWeight: 600, color: "#222", marginTop: 2 }}>{escola.data_inicio ? new Date(escola.data_inicio + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</div></div>
+            <div><div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Início das Aulas</div><div style={{ fontWeight: 600, color: "#222", marginTop: 2 }}>{escola.data_inicio ? new Date(escola.data_inicio + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</div></div>
             <div><div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Recebimento do Material</div><div style={{ fontWeight: 600, color: "#222", marginTop: 2 }}>{escola.data_recebimento ? new Date(escola.data_recebimento + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</div></div>
             {escola.num_salas_maker != null && (
               <div>
@@ -1347,18 +1347,18 @@ function ModalDetalhes({ escola, onClose, onDelete, isAdmin }) {
         )}
         {hist && hist.responsavel_preenchimento && (
           <div style={{ padding: "12px 28px", borderBottom: "1px solid #f0f0f0" }}>
-            <div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Responsavel pelo Preenchimento</div>
+            <div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Responsável pelo Preenchimento</div>
             <div style={{ fontWeight: 600, color: "#222", marginTop: 2, fontSize: 13 }}>{hist.responsavel_preenchimento}</div>
           </div>
         )}
         <div style={{ padding: "20px 28px", borderBottom: "1px solid #f0f0f0" }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: 1, marginBottom: 16 }}>
-            Series e Turmas ({escola.num_series} serie{escola.num_series !== 1 ? "s" : ""}, {escola.num_turmas} turma{escola.num_turmas !== 1 ? "s" : ""})
+            Séries e Turmas ({escola.num_series} série{escola.num_series !== 1 ? "s" : ""}, {escola.num_turmas} turma{escola.num_turmas !== 1 ? "s" : ""})
           </div>
           {!detalhes ? (
             <div style={{ color: "#aaa", fontSize: 13 }}>Carregando...</div>
           ) : seriesComTurmas.length === 0 ? (
-            <div style={{ color: "#aaa", fontSize: 13 }}>Nenhuma serie cadastrada.</div>
+            <div style={{ color: "#aaa", fontSize: 13 }}>Nenhuma série cadastrada.</div>
           ) : (
             seriesComTurmas.map(serie => (
               <div key={serie.id} style={{ marginBottom: 16 }}>
@@ -1380,7 +1380,7 @@ function ModalDetalhes({ escola, onClose, onDelete, isAdmin }) {
         {hist && hist.calendario_url && (
           <div style={{ padding: "14px 28px", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
-              <div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Calendario Escolar Anexado</div>
+              <div style={{ fontSize: 10, color: "#aaa", textTransform: "uppercase" }}>Calendário Escolar Anexado</div>
               <div style={{ fontWeight: 600, color: "#222", fontSize: 13, marginTop: 2 }}>{hist.calendario_nome || "Arquivo"}</div>
             </div>
             <a href={hist.calendario_url} target="_blank" rel="noreferrer"
@@ -1401,7 +1401,7 @@ function ModalDetalhes({ escola, onClose, onDelete, isAdmin }) {
             </button>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 13, color: "#e53935", fontWeight: 600 }}>Confirmar exclusao?</span>
+              <span style={{ fontSize: 13, color: "#e53935", fontWeight: 600 }}>Confirmar exclusão?</span>
               <button onClick={() => setConfirmDelete(false)}
                 style={{ background: "#f5f5f5", color: "#333", border: "none", borderRadius: 4, padding: "9px 14px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>Cancelar</button>
               <button onClick={() => onDelete(escola.id)}
@@ -1442,7 +1442,7 @@ function ProjecaoMaterial({ escolas, onVoltar }) {
 
   const porFrete = {};
   escolas.forEach(e => {
-    const f = e.tipo_frete || "Nao informado";
+    const f = e.tipo_frete || "Não informado";
     if (!porFrete[f]) porFrete[f] = { escolas: 0, alunos: 0 };
     porFrete[f].escolas++;
     porFrete[f].alunos += e.total_alunos || 0;
@@ -1450,7 +1450,7 @@ function ProjecaoMaterial({ escolas, onVoltar }) {
 
   const porPrograma = {};
   escolas.forEach(e => {
-    const p = e.programa || "Nao informado";
+    const p = e.programa || "Não informado";
     if (!porPrograma[p]) porPrograma[p] = { escolas: 0, alunos: 0 };
     porPrograma[p].escolas++;
     porPrograma[p].alunos += e.total_alunos || 0;
@@ -1479,8 +1479,8 @@ function ProjecaoMaterial({ escolas, onVoltar }) {
           <button onClick={onVoltar} style={{ background: "none", border: "none", color: "#666", fontSize: 13, cursor: "pointer", fontFamily: font, padding: 0, marginBottom: 6 }}>
             Voltar ao Dashboard
           </button>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#111" }}>Projecao de Saida de Material</div>
-          <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>Planejamento de entregas, producao e emissao de NF</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#111" }}>Projeção de Saída de Material</div>
+          <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>Planejamento de entregas, produção e emissão de NF</div>
         </div>
         <div style={{ background: "#111", borderRadius: 8, padding: "16px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 32, fontWeight: 800, color: "#39DF18", lineHeight: 1 }}>{totalProjetado.toLocaleString("pt-BR")}</div>
@@ -1489,7 +1489,7 @@ function ProjecaoMaterial({ escolas, onVoltar }) {
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
         <button style={btnStyle(subView === "datas")} onClick={() => setSubView("datas")}>Por Data de Entrega</button>
-        <button style={btnStyle(subView === "mensal")} onClick={() => setSubView("mensal")}>Visao Mensal</button>
+        <button style={btnStyle(subView === "mensal")} onClick={() => setSubView("mensal")}>Visão Mensal</button>
         <button style={btnStyle(subView === "frete")} onClick={() => setSubView("frete")}>Por Tipo de Frete</button>
         <button style={btnStyle(subView === "programa")} onClick={() => setSubView("programa")}>Por Programa</button>
       </div>
@@ -2150,7 +2150,7 @@ export default function Dashboard() {
           {perm.historico && (
             <button onClick={() => setView(view === "historico" ? "dashboard" : "historico")}
               style={{ background: view === "historico" ? "#000" : "rgba(0,0,0,0.12)", color: view === "historico" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-              Historico de Ciclos {ciclosHist.length > 0 && `(${ciclosHist.length})`}
+              Histórico de Ciclos {ciclosHist.length > 0 && `(${ciclosHist.length})`}
             </button>
           )}
           {perm.escolas && (
@@ -2168,7 +2168,7 @@ export default function Dashboard() {
           {perm.projecao && (
             <button onClick={() => setView(view === "projecao" ? "dashboard" : "projecao")}
               style={{ background: view === "projecao" ? "#000" : "rgba(0,0,0,0.12)", color: view === "projecao" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-              Projecao de Material
+              Projeção de Material
             </button>
           )}
           {perm.baseEscolas && (
@@ -2297,7 +2297,7 @@ export default function Dashboard() {
               </div>
 
               <div style={{ background: "#fff", borderRadius: 8, padding: "24px 28px", marginBottom: 24, boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#111", textTransform: "uppercase", letterSpacing: 1, marginBottom: 20 }}>Distribuicao por Cluster</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#111", textTransform: "uppercase", letterSpacing: 1, marginBottom: 20 }}>Distribuição por Cluster</div>
                 {porCluster.map(({ cluster, count }) => {
                   const pct = totalEscolas > 0 ? (count / totalEscolas) * 100 : 0;
                   return (
@@ -2316,7 +2316,7 @@ export default function Dashboard() {
 
               <div style={{ background: "#fff", borderRadius: 8, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", overflow: "hidden" }}>
                 <div style={{ background: "#111", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: 1.5 }}>Envio de Formularios</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: 1.5 }}>Envio de Formulários</div>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar escola..."
                       style={{ padding: "7px 12px", borderRadius: 4, border: "none", fontSize: 13, fontFamily: font, width: 200 }} />
@@ -2332,7 +2332,7 @@ export default function Dashboard() {
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
                       <tr style={{ background: "#f5f5f5" }}>
-                        {["Escola", "Programa", "Idioma", "Cluster", "Alunos", "Frete", "Data", "Acoes"].map(h => (
+                        {["Escola", "Programa", "Idioma", "Cluster", "Alunos", "Frete", "Data", "Ações"].map(h => (
                           <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</th>
                         ))}
                       </tr>
@@ -2340,7 +2340,7 @@ export default function Dashboard() {
                     <tbody>
                       {escolasFiltradas.length === 0 ? (
                         <tr><td colSpan={8} style={{ padding: "32px", textAlign: "center", color: "#aaa", fontSize: 14 }}>
-                          {busca ? "Nenhuma escola encontrada." : "Nenhum formulario enviado neste ciclo."}
+                          {busca ? "Nenhuma escola encontrada." : "Nenhum formulário enviado neste ciclo."}
                         </td></tr>
                       ) : escolasFiltradas.map((escola, i) => (
                         <tr key={escola.id} style={{ borderTop: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
