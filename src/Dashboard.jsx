@@ -1804,6 +1804,28 @@ export default function Dashboard() {
     }
   }
 
+  // Inicia um ciclo quando não há nenhum ativo (ex.: tabela de ciclos zerada)
+  async function iniciarCiclo() {
+    if (cicloAtivo) return;
+    const now = new Date();
+    const sugestao = `Ciclo ${now.getMonth() < 6 ? "1" : "2"}S ${now.getFullYear()}`;
+    const nome = window.prompt("Nome do novo ciclo:", sugestao);
+    if (!nome || !nome.trim()) return;
+
+    // Escolas enviadas depois do último ciclo encerrado entram neste ciclo:
+    // o início passa a ser o do primeiro envio ainda não arquivado.
+    let inicio = new Date().toISOString();
+    const ultimoEncerramento = ciclosHist[0]?.data_encerramento;
+    let q = supabase.from("schools").select("created_at").order("created_at", { ascending: true }).limit(1);
+    if (ultimoEncerramento) q = q.gt("created_at", ultimoEncerramento);
+    const { data: primeira } = await q;
+    if (primeira && primeira[0]?.created_at) inicio = primeira[0].created_at;
+
+    const { error } = await supabase.from("ciclos").insert({ nome: nome.trim(), data_inicio: inicio });
+    if (error) { alert("Erro ao iniciar o ciclo: " + error.message); return; }
+    await carregarDados();
+  }
+
   // Salva o romaneio fechado (PDF + Excel + dados) no histórico
   async function salvarRomaneioFechado({ manifest, rotulo, pdf, xlsx }) {
     const base = `${Date.now()}_${(manifest.schoolName || "Escola").replace(/[^a-zA-Z0-9_-]/g, "_")}_${rotulo}`;
@@ -2064,10 +2086,16 @@ export default function Dashboard() {
               Usuários
             </button>
           )}
-          {isAdmin && (
+          {isAdmin && cicloAtivo && (
             <button onClick={() => setModalCiclo(true)}
               style={{ background: "#e53935", color: "#fff", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
               Encerrar Ciclo
+            </button>
+          )}
+          {isAdmin && !cicloAtivo && !loading && (
+            <button onClick={iniciarCiclo}
+              style={{ background: "#fff", color: "#000", border: "2px solid #000", borderRadius: 4, padding: "6px 16px", fontSize: 12, fontWeight: 800, fontFamily: font, cursor: "pointer" }}>
+              Iniciar Ciclo
             </button>
           )}
           {equipeLogada && (
