@@ -1045,6 +1045,77 @@ function InspiramakerDashboard({ onVoltar }) {
     win.document.close();
   }
 
+  async function gerarExcel() {
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const { saveAs } = await import("file-saver");
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("Inspiramaker");
+
+      const turmaCols = TURMA_LABELS.slice(0, maxTurmas);
+      const cabecalho = ["Idioma", "Escola/Turma", "Projeto", "Ano Escolar", ...turmaCols, "Alunado Total", "Base", "Professor", "Complementar"];
+
+      ws.addRow(["Mundo Maker — Inspiramaker | MakerLab Oficina"]).font = { bold: true, size: 14 };
+      ws.addRow([`Gerado em ${new Date().toLocaleDateString("pt-BR")} — 1 caixa a cada 4 alunos (arredondado para cima)`]).font = { italic: true, color: { argb: "FF888888" }, size: 10 };
+      ws.addRow([]);
+
+      const head = ws.addRow(cabecalho);
+      head.eachCell((cell, col) => {
+        const nome = cabecalho[col - 1];
+        cell.font = { bold: true, color: { argb: nome === "Base" || nome === "Complementar" ? "FF000000" : "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: nome === "Base" ? "FF39DF18" : nome === "Complementar" ? "FFFFA300" : "FF111111" } };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      });
+
+      const colBase = cabecalho.indexOf("Base") + 1;
+      const colComp = cabecalho.indexOf("Complementar") + 1;
+
+      filtrados.forEach(escola => {
+        escola.series.forEach((s, si) => {
+          const tot  = s.turmas.reduce((a, t) => a + (t.num_alunos || 0), 0);
+          const base = s.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0);
+          const comp = calcularComplementar(projetos[s.gcId] || "", s, escola.numSalas);
+          const linha = ws.addRow([
+            si === 0 ? escola.idioma : "",
+            si === 0 ? escola.nome : "",
+            projetos[s.gcId] || "",
+            s.serie,
+            ...turmaCols.map((_, i) => (s.turmas[i] ? s.turmas[i].num_alunos : "")),
+            tot, base, 1, comp,
+          ]);
+          if (si === 0) linha.getCell(2).font = { bold: true };
+          linha.getCell(colBase).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8F5E9" } };
+          linha.getCell(colComp).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF3E0" } };
+          linha.getCell(colBase).font = { bold: true };
+          linha.getCell(colComp).font = { bold: true };
+          linha.eachCell((cell, col) => { if (col >= 4) cell.alignment = { horizontal: "center" }; });
+        });
+      });
+
+      const total = ws.addRow([
+        "TOTAL GERAL", "", "", "",
+        ...turmaCols.map(() => ""),
+        totalAlunosGeral, totalBaseGeral, totalProfGeral, totalCompGeral,
+      ]);
+      total.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF111111" } };
+        cell.alignment = { horizontal: "center" };
+      });
+      total.getCell(1).alignment = { horizontal: "left" };
+
+      ws.columns.forEach((c, i) => { c.width = i === 1 ? 28 : i === 2 ? 24 : i < 4 ? 14 : 13; });
+      ws.views = [{ state: "frozen", ySplit: 4 }];
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      saveAs(blob, `Inspiramaker_${new Date().toLocaleDateString("pt-BR").replace(/\//g, "-")}.xlsx`);
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao gerar Excel: " + e.message);
+    }
+  }
+
   return (
     <div style={{ maxWidth: 1400, margin: "0 auto", padding: "32px 20px", fontFamily: font }}>
       <div style={{ marginBottom: 24 }}>
@@ -1084,9 +1155,13 @@ function InspiramakerDashboard({ onVoltar }) {
               <div style={{ display: "flex", gap: 10 }}>
                 <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar escola..."
                   style={{ padding: "7px 12px", borderRadius: 4, border: "none", fontSize: 13, fontFamily: font, width: 200 }} />
-                <button onClick={gerarPlanilha}
+                <button onClick={gerarPlanilha} title="Abre a planilha para imprimir ou salvar como PDF"
+                  style={{ background: "#e53935", color: "#fff", border: "none", borderRadius: 4, padding: "7px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  PDF
+                </button>
+                <button onClick={gerarExcel} title="Baixa a planilha em Excel (.xlsx)"
                   style={{ background: "#39DF18", color: "#000", border: "none", borderRadius: 4, padding: "7px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer", whiteSpace: "nowrap" }}>
-                  Gerar Planilha
+                  Excel
                 </button>
               </div>
             </div>
