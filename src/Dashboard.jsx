@@ -857,6 +857,22 @@ function InspiramakerDashboard({ onVoltar }) {
   const [loading, setLoading]   = useState(true);
   const [busca, setBusca]       = useState("");
   const [projetos, setProjetos] = useState({});
+  const [editandoGc, setEditandoGc] = useState(null); // id da série em edição
+  const [rascunho, setRascunho]     = useState("");
+
+  function iniciarEdicao(gcId) {
+    setEditandoGc(gcId);
+    setRascunho(projetos[gcId] || "");
+  }
+
+  async function confirmarEdicao(gcId) {
+    const novo = rascunho.trim();
+    if (novo === (projetos[gcId] || "")) { setEditandoGc(null); return; }
+    if (!window.confirm(`Alterar o projeto para "${novo || "(vazio)"}"? Isso muda o cálculo do complementar.`)) return;
+    await salvarProjeto(gcId, novo);
+    setProjetos(p => ({ ...p, [gcId]: novo }));
+    setEditandoGc(null);
+  }
 
   const TURMA_LABELS = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P"];
 
@@ -1106,13 +1122,33 @@ function InspiramakerDashboard({ onVoltar }) {
                           <td style={{ padding: "8px 14px", color: "#555", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{primeiro ? escola.idioma : ""}</td>
                           <td style={{ padding: "8px 14px", fontWeight: primeiro ? 700 : 400, color: "#111", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{primeiro ? escola.nome : ""}</td>
                           <td style={{ padding: "4px 8px", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>
-                            <input
-                              value={projetos[s.gcId] || ""}
-                              onChange={e => setProjetos(p => ({ ...p, [s.gcId]: e.target.value }))}
-                              onBlur={e => salvarProjeto(s.gcId, e.target.value)}
-                              placeholder="Digite o projeto..."
-                              style={{ width: 140, padding: "5px 8px", border: "1.5px solid #ddd", borderRadius: 4, fontSize: 11, fontFamily: font, background: "#fff" }}
-                            />
+                            {editandoGc === s.gcId ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                <input
+                                  autoFocus
+                                  value={rascunho}
+                                  onChange={e => setRascunho(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === "Enter") confirmarEdicao(s.gcId);
+                                    if (e.key === "Escape") setEditandoGc(null);
+                                  }}
+                                  placeholder="Digite o projeto..."
+                                  style={{ width: 140, padding: "5px 8px", border: "1.5px solid #39DF18", borderRadius: 4, fontSize: 11, fontFamily: font, background: "#fff" }}
+                                />
+                                <button onClick={() => confirmarEdicao(s.gcId)} title="Salvar"
+                                  style={{ background: "#39DF18", color: "#000", border: "none", borderRadius: 4, padding: "5px 8px", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>✓</button>
+                                <button onClick={() => setEditandoGc(null)} title="Cancelar"
+                                  style={{ background: "#eee", color: "#555", border: "none", borderRadius: 4, padding: "5px 8px", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>✕</button>
+                              </div>
+                            ) : (
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 140 }}>
+                                <span style={{ fontSize: 12, color: projetos[s.gcId] ? "#111" : "#bbb", fontWeight: projetos[s.gcId] ? 600 : 400 }}>
+                                  {projetos[s.gcId] || "—"}
+                                </span>
+                                <button onClick={() => iniciarEdicao(s.gcId)} title="Editar projeto"
+                                  style={{ background: "none", border: "1px solid #ddd", borderRadius: 4, padding: "2px 6px", fontSize: 11, color: "#777", cursor: "pointer" }}>✎</button>
+                              </div>
+                            )}
                           </td>
                           <td style={{ padding: "8px 10px", textAlign: "center", color: "#555", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{s.serie}</td>
                           {labels.map((_, i) => {
