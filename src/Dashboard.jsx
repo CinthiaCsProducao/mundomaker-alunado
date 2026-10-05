@@ -48,9 +48,10 @@ function removerAcentos(str) {
 function categorizarSegmento(serie) {
   const s = removerAcentos((serie || "").toLowerCase());
   if (/berc|maternal|jardim|pre.escola|pre\s*escola|infantil|creche/.test(s) || /^pre$/.test(s.trim())) return "Infantil";
-  if (/^[1-5][ao]?\s*ano/.test(s) || /primeiro|segundo|terceiro|quarto|quinto/.test(s)) return "Fundamental 1";
-  if (/^[6-9][ao]?\s*ano/.test(s) || /sexto|setimo|oitavo|nono/.test(s)) return "Fundamental 2";
-  if (/medio|media|ensino.medio|^[123][ao]\s*serie/.test(s)) return "Ensino Medio";
+  // Aceita º (U+00BA), ª, ° e o/a: "6º ano", "6° ano", "6o ano", "6 ano"
+  if (/^[1-5]\s*[ºª°ao]?\s*ano/.test(s) || /primeiro|segundo|terceiro|quarto|quinto/.test(s)) return "Fundamental 1";
+  if (/^[6-9]\s*[ºª°ao]?\s*ano/.test(s) || /sexto|setimo|oitavo|nono/.test(s)) return "Fundamental 2";
+  if (/medio|media|ensino.medio|^[123]\s*[ºª°ao]?\s*serie/.test(s)) return "Ensino Medio";
   return "Outros";
 }
 
