@@ -2265,7 +2265,7 @@ export default function Dashboard() {
       )}
 
       {view === "pops" && (
-        <PopsDocumentos onVoltar={() => setView("dashboard")} isAdmin={isAdmin} usuario={equipeLogada?.equipe} />
+        <PopsDocumentos onVoltar={() => setView("dashboard")} isAdmin={isAdmin} usuario={equipeLogada?.equipe} email={equipeLogada?.email} permissoesIniciais={equipeLogada?.permissoes} />
       )}
 
       {view === "usuarios" && (

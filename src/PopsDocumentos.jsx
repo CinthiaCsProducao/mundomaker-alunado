@@ -47,7 +47,9 @@ function tamanhoLegivel(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export default function PopsDocumentos({ onVoltar, isAdmin, usuario }) {
+export default function PopsDocumentos({ onVoltar, isAdmin, usuario, email, permissoesIniciais }) {
+  const [permissoes, setPermissoes] = useState(permissoesIniciais || {});
+  const [permPronta, setPermPronta] = useState(!!isAdmin);
   const [lista, setLista] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
@@ -65,19 +67,39 @@ export default function PopsDocumentos({ onVoltar, isAdmin, usuario }) {
   const [erroEnvio, setErroEnvio] = useState("");
   const inputArquivo = useRef(null);
 
+  // Busca as permissões atuais do usuário no banco (assim uma mudança feita
+  // pelo admin vale sem precisar sair e entrar de novo).
+  useEffect(() => {
+    if (isAdmin || !email) { setPermPronta(true); return; }
+    supabase.from("usuarios").select("permissoes").eq("email", email).single()
+      .then(({ data }) => {
+        if (data && data.permissoes) setPermissoes(data.permissoes);
+        setPermPronta(true);
+      });
+  }, [isAdmin, email]);
+
+  // Áreas que este usuário pode ver. Admin = todas. Campo ausente (usuário
+  // antigo) ou "*" = todas.
+  const areasLiberadas = useMemo(() => {
+    if (isAdmin) return AREAS;
+    const p = permissoes.popsAreas;
+    if (p === undefined || (Array.isArray(p) && p.includes("*"))) return AREAS;
+    return AREAS.filter(a => Array.isArray(p) && p.includes(a));
+  }, [isAdmin, permissoes]);
+
   async function carregar() {
+    if (!permPronta) return;
     setCarregando(true);
     setErro("");
-    const { data, error } = await supabase
-      .from("pops_documentos")
-      .select("*")
-      .order("criado_em", { ascending: false });
+    let q = supabase.from("pops_documentos").select("*").order("criado_em", { ascending: false });
+    if (areasLiberadas.length < AREAS.length) q = q.in("area", areasLiberadas.length ? areasLiberadas : ["__nenhuma__"]);
+    const { data, error } = await q;
     if (error) setErro("Erro ao carregar os POPs: " + error.message);
     setLista(data || []);
     setCarregando(false);
   }
 
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => { carregar(); }, [permPronta, areasLiberadas]); // eslint-disable-line
 
   const filtrada = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -97,7 +119,7 @@ export default function PopsDocumentos({ onVoltar, isAdmin, usuario }) {
   }, [lista]);
 
   function abrirModal() {
-    setTitulo(""); setArea(AREAS[0]); setDescricao(""); setArquivo(null); setErroEnvio("");
+    setTitulo(""); setArea(areasLiberadas[0] || AREAS[0]); setDescricao(""); setArquivo(null); setErroEnvio("");
     setModalAberto(true);
   }
 
@@ -125,6 +147,7 @@ export default function PopsDocumentos({ onVoltar, isAdmin, usuario }) {
     setErroEnvio("");
     if (!arquivo) { setErroEnvio("Selecione um arquivo PDF ou Word."); return; }
     if (!titulo.trim()) { setErroEnvio("Informe o título do POP."); return; }
+    if (!areasLiberadas.includes(area)) { setErroEnvio("Você não tem permissão para anexar POPs nessa área."); return; }
     const ext = extensaoDe(arquivo);
     if (!ext) { setErroEnvio("Formato não aceito."); return; }
 
@@ -185,16 +208,24 @@ export default function PopsDocumentos({ onVoltar, isAdmin, usuario }) {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 6 }}>
         <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>POPs</h2>
-        <button onClick={abrirModal} style={{ ...btn, background: "#39DF18", color: "#000", padding: "10px 18px", fontSize: 13 }}>
-          + Anexar POP
-        </button>
+        {areasLiberadas.length > 0 && (
+          <button onClick={abrirModal} style={{ ...btn, background: "#39DF18", color: "#000", padding: "10px 18px", fontSize: 13 }}>
+            + Anexar POP
+          </button>
+        )}
       </div>
       <div style={{ fontSize: 13, color: "#666", marginBottom: 18 }}>
         Procedimentos Operacionais Padrão de cada área. Envie arquivos em PDF ou Word.
       </div>
 
+      {permPronta && areasLiberadas.length === 0 && (
+        <div style={{ background: "#fff8e1", border: "1.5px solid #FFD902", color: "#7a6000", padding: 14, borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
+          Você ainda não tem acesso aos POPs de nenhuma área. Peça a um administrador para liberar a sua área.
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-        {["Todas", ...AREAS].map(a => (
+        {(areasLiberadas.length > 1 ? ["Todas", ...areasLiberadas] : areasLiberadas).map(a => (
           <button key={a} onClick={() => setAreaFiltro(a)}
             style={{
               ...btn, padding: "7px 14px",
@@ -265,7 +296,7 @@ export default function PopsDocumentos({ onVoltar, isAdmin, usuario }) {
 
             <label style={rotulo}>Área</label>
             <select value={area} onChange={e => setArea(e.target.value)} style={{ ...campo, marginBottom: 14, background: "#fff" }}>
-              {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
+              {areasLiberadas.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
 
             <label style={rotulo}>Descrição (opcional)</label>

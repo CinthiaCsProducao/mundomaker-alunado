@@ -25,7 +25,10 @@ async function hashSenha(senha) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
 }
 
-const PERM_VAZIO = { historico:false, escolas:false, inspiramaker:false, projecao:false, baseEscolas:false, admin:false };
+const PERM_VAZIO = { historico:false, escolas:false, inspiramaker:false, projecao:false, baseEscolas:false, admin:false, popsAreas:[] };
+
+// Áreas dos POPs. Valor "*" = todas. Usuário antigo (sem o campo) = todas.
+const AREAS_POPS = ["CS", "Pedagógico", "Financeiro", "Produção", "Diretoria", "Comercial", "Núcleo Técnico"];
 
 function ModalUsuario({ usuario, onSave, onClose }) {
   const isNovo = !usuario.id;
@@ -41,6 +44,16 @@ function ModalUsuario({ usuario, onSave, onClose }) {
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
   function setPerm(k, v) { setForm(f => ({ ...f, permissoes: { ...f.permissoes, [k]: v } })); }
+
+  const popsAreas = form.permissoes.popsAreas === undefined ? ["*"] : form.permissoes.popsAreas;
+  function togglePopsArea(area) {
+    if (area === "*") {
+      setPerm("popsAreas", popsAreas.includes("*") ? [] : ["*"]);
+      return;
+    }
+    const base = popsAreas.filter(a => a !== "*");
+    setPerm("popsAreas", base.includes(area) ? base.filter(a => a !== area) : [...base, area]);
+  }
 
   async function salvar() {
     setErro("");
@@ -73,7 +86,7 @@ function ModalUsuario({ usuario, onSave, onClose }) {
 
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16 }}>
-      <div style={{ background:"#fff",borderRadius:10,width:"100%",maxWidth:480,padding:28,boxShadow:"0 8px 32px rgba(0,0,0,.2)" }}>
+      <div style={{ background:"#fff",borderRadius:10,width:"100%",maxWidth:480,padding:28,boxShadow:"0 8px 32px rgba(0,0,0,.2)",maxHeight:"92vh",overflowY:"auto" }}>
         <h3 style={{ fontFamily:font,fontWeight:800,fontSize:18,margin:"0 0 20px" }}>
           {isNovo ? "Novo Usuário" : "Editar Usuário"}
         </h3>
@@ -102,6 +115,24 @@ function ModalUsuario({ usuario, onSave, onClose }) {
               <span style={{ fontSize:14,fontFamily:font,color:"#222" }}>{p.label}</span>
             </div>
           ))}
+        </div>
+
+        <div style={{ marginBottom:16 }}>
+          <label style={{ fontSize:11,fontWeight:700,color:"#555",textTransform:"uppercase",letterSpacing:.8,display:"block",marginBottom:8 }}>POPs que pode acessar</label>
+          {[{ key:"*", label:"Todas as áreas" }, ...AREAS_POPS.map(a => ({ key:a, label:a }))].map(p => {
+            const marcado = popsAreas.includes("*") || popsAreas.includes(p.key);
+            const bloqueado = p.key !== "*" && popsAreas.includes("*");
+            return (
+              <div key={p.key} onClick={()=>togglePopsArea(p.key)}
+                style={{ display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:8,opacity: bloqueado ? .55 : 1 }}>
+                <div style={{ width:18,height:18,border:`2px solid ${marcado?VERDE:"#ccc"}`,borderRadius:3,background:marcado?VERDE:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                  {marcado && <span style={{ fontSize:11,fontWeight:900,color:PRETO }}>✓</span>}
+                </div>
+                <span style={{ fontSize:14,fontFamily:font,color:"#222",fontWeight: p.key === "*" ? 700 : 400 }}>{p.label}</span>
+              </div>
+            );
+          })}
+          <div style={{ fontSize:11,color:"#888",marginTop:4 }}>Administradores sempre veem todas as áreas.</div>
         </div>
 
         <div onClick={()=>set("ativo",!form.ativo)}
