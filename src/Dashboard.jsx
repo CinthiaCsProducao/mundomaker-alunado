@@ -5,6 +5,7 @@ import GerenciarUsuarios from "./GerenciarUsuarios";
 import CortesDashboard from "./CortesDashboard";
 import RomaneioTab from "./romaneio-tab";
 import HistoricoRomaneios from "./HistoricoRomaneios";
+import PopsDocumentos from "./PopsDocumentos";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -2191,6 +2192,10 @@ export default function Dashboard() {
             style={{ background: view === "histromaneios" ? "#000" : "rgba(0,0,0,0.12)", color: view === "histromaneios" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
             Hist. Romaneios
           </button>
+          <button onClick={() => setView(view === "pops" ? "dashboard" : "pops")}
+            style={{ background: view === "pops" ? "#000" : "rgba(0,0,0,0.12)", color: view === "pops" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+            POPs
+          </button>
           {isAdmin && (
             <button onClick={() => setView(view === "usuarios" ? "dashboard" : "usuarios")}
               style={{ background: view === "usuarios" ? "#000" : "rgba(0,0,0,0.12)", color: view === "usuarios" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
@@ -2257,6 +2262,10 @@ export default function Dashboard() {
 
       {view === "histromaneios" && (
         <HistoricoRomaneios onVoltar={() => setView("dashboard")} />
+      )}
+
+      {view === "pops" && (
+        <PopsDocumentos onVoltar={() => setView("dashboard")} isAdmin={isAdmin} usuario={equipeLogada?.equipe} />
       )}
 
       {view === "usuarios" && (
