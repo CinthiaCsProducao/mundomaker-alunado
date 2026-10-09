@@ -1630,6 +1630,110 @@ function ContratosVencendo({ escolas, onAbrir, onFechar }) {
   );
 }
 
+// ── Aniversariantes do mês ──────────────────────────────────────
+function AniversariantesMes({ escolas, onAbrir, onFechar }) {
+  // O mês padrão é sempre o mês corrente: a lista se renova sozinha a cada mês,
+  // lendo o "Aniversário" dos contatos de cada escola.
+  const agora = new Date();
+  const mesAtual = agora.getMonth();
+  const [mes, setMes] = useState(mesAtual);
+  const [incluirInativas, setIncluirInativas] = useState(false);
+
+  const contatos = [];
+  escolas
+    .filter(e => incluirInativas || e.status === "Ativo")
+    .forEach(e => (e.contatos || []).forEach(c => {
+      const v = lerValidade(c.aniversario);
+      if (v) contatos.push({ escola: e, c, v });
+    }));
+  const semData = escolas
+    .filter(e => incluirInativas || e.status === "Ativo")
+    .reduce((n, e) => n + (e.contatos || []).filter(c => !lerValidade(c.aniversario)).length, 0);
+
+  const doMes = contatos.filter(x => x.v.mes === mes).sort((a, b) => a.v.dia - b.v.dia || (a.c.nome || "").localeCompare(b.c.nome || "", "pt-BR"));
+  const hoje = doMes.filter(x => mes === mesAtual && x.v.dia === agora.getDate()).length;
+  const proximos7 = doMes.filter(x => mes === mesAtual && x.v.dia > agora.getDate() && x.v.dia <= agora.getDate() + 7).length;
+
+  function exportarCSV() {
+    const linhas = [["Dia","Nome","Cargo","Escola","E-mail","Telefone"]];
+    doMes.forEach(({ escola, c, v }) => linhas.push([
+      `${String(v.dia).padStart(2,"0")}/${String(v.mes+1).padStart(2,"0")}`, c.nome, c.cargo, escola.nome, c.email, c.telefone,
+    ].map(x => x ?? "")));
+    const csv = "﻿" + linhas.map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `Aniversariantes_${MESES[mes]}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  const card = (valor, rotulo, cor) => (
+    <div style={{ background:"#fff",borderRadius:6,padding:"16px 20px",borderTop:`4px solid ${cor}` }}>
+      <div style={{ fontSize:30,fontWeight:800,fontFamily:font,lineHeight:1 }}>{valor}</div>
+      <div style={{ fontSize:11,fontWeight:700,fontFamily:font,letterSpacing:".05em",textTransform:"uppercase",color:"#6D6E71",marginTop:4 }}>{rotulo}</div>
+    </div>
+  );
+
+  return (
+    <div style={{ maxWidth:1400,margin:"0 auto",padding:"0 clamp(16px,4vw,40px) 40px" }}>
+      <div style={{ display:"flex",gap:12,alignItems:"center",flexWrap:"wrap",marginBottom:16 }}>
+        <button onClick={onFechar}
+          style={{ background:"none",border:"2px solid #DCDDDE",borderRadius:6,padding:"8px 14px",fontSize:13,fontWeight:700,fontFamily:font,cursor:"pointer" }}>
+          ← Voltar à lista
+        </button>
+        <h2 style={{ margin:0,fontSize:22,fontWeight:800,fontFamily:font }}>Aniversariantes de</h2>
+        <select value={mes} onChange={e=>setMes(+e.target.value)}
+          style={{ background:"#fff",border:"2px solid #DCDDDE",borderRadius:6,padding:"8px 12px",fontFamily:font,fontSize:16,fontWeight:800,cursor:"pointer" }}>
+          {MESES.map((m, i) => <option key={m} value={i}>{m}{i === mesAtual ? " (mês atual)" : ""}</option>)}
+        </select>
+        <label style={{ display:"flex",alignItems:"center",gap:6,fontSize:13,fontFamily:fontB,cursor:"pointer" }}>
+          <input type="checkbox" checked={incluirInativas} onChange={e=>setIncluirInativas(e.target.checked)} />
+          Incluir escolas inativas
+        </label>
+        <button onClick={exportarCSV} disabled={!doMes.length}
+          style={{ marginLeft:"auto",background:VERDE,color:PRETO,border:"none",borderRadius:6,padding:"9px 16px",fontSize:13,fontWeight:800,fontFamily:font,cursor:doMes.length?"pointer":"not-allowed",opacity:doMes.length?1:.5 }}>
+          ↓ Exportar CSV
+        </button>
+      </div>
+
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12,marginBottom:20 }}>
+        {card(doMes.length, `Aniversariantes em ${MESES[mes]}`, PRETO)}
+        {mes === mesAtual && card(hoje, "Aniversariam hoje", VERDE)}
+        {mes === mesAtual && card(proximos7, "Nos próximos 7 dias", "#FFD902")}
+        {card(semData, "Contatos sem aniversário", "#DCDDDE")}
+      </div>
+
+      {doMes.length === 0 ? (
+        <div style={{ background:"#fff",borderRadius:6,padding:40,textAlign:"center",color:"#888",fontFamily:fontB }}>
+          Nenhum contato faz aniversário em {MESES[mes]}.
+        </div>
+      ) : (
+        <div style={{ background:"#fff",borderRadius:6,overflow:"hidden" }}>
+          <div style={{ background:"#231F20",color:"#fff",padding:"10px 18px",fontFamily:font,fontWeight:800,fontSize:13,letterSpacing:".05em",textTransform:"uppercase" }}>
+            {MESES[mes]}
+          </div>
+          {doMes.map(({ escola, c, v }, i) => {
+            const ehHoje = mes === mesAtual && v.dia === agora.getDate();
+            return (
+              <div key={`${escola.id}-${i}`} onClick={()=>onAbrir(escola)}
+                style={{ display:"grid",gridTemplateColumns:"60px 1fr auto",gap:14,alignItems:"center",padding:"12px 18px",borderBottom:"1px solid #DCDDDE",cursor:"pointer",background:ehHoje?"rgba(57,223,24,.1)":"transparent" }}>
+                <b style={{ fontFamily:font,fontSize:18 }}>{String(v.dia).padStart(2,"0")}</b>
+                <span>
+                  <b style={{ display:"block",fontSize:14,fontFamily:font }}>{c.nome || "—"}{c.cargo ? ` · ${c.cargo}` : ""}</b>
+                  <small style={{ color:"#6D6E71",fontSize:12 }}>
+                    {[escola.nome, c.email, c.telefone].filter(Boolean).join(" · ")}
+                  </small>
+                </span>
+                {ehHoje && <span style={{ fontSize:11,fontWeight:800,fontFamily:font,padding:"4px 10px",borderRadius:999,background:VERDE,color:PRETO }}>🎂 Hoje!</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BaseEscolas({ onVoltar, equipeLogada }) {
   const [escolas, setEscolas]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -1644,6 +1748,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
   const [, setSalvando]   = useState(false);
   const [novaModal, setNovaModal] = useState(false);
   const [verContratos, setVerContratos] = useState(false);
+  const [verAniv, setVerAniv] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -1870,9 +1975,13 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
             {opts.map(o=><option key={o}>{o}</option>)}
           </select>
         ))}
-        <button onClick={()=>setVerContratos(v=>!v)}
+        <button onClick={()=>{ setVerContratos(v=>!v); setVerAniv(false); }}
           style={{ background:verContratos?PRETO:"#fff",color:verContratos?"#fff":PRETO,border:"2px solid "+(verContratos?PRETO:"#DCDDDE"),borderRadius:6,padding:"9px 16px",fontSize:14,fontWeight:800,fontFamily:font,cursor:"pointer" }}>
           📅 Contratos a vencer
+        </button>
+        <button onClick={()=>{ setVerAniv(v=>!v); setVerContratos(false); }}
+          style={{ background:verAniv?PRETO:"#fff",color:verAniv?"#fff":PRETO,border:"2px solid "+(verAniv?PRETO:"#DCDDDE"),borderRadius:6,padding:"9px 16px",fontSize:14,fontWeight:800,fontFamily:font,cursor:"pointer" }}>
+          🎂 Aniversariantes do mês
         </button>
         <button onClick={()=>setNovaModal(true)}
           style={{ background:VERDE,color:PRETO,border:"none",borderRadius:6,padding:"10px 16px",fontSize:14,fontWeight:800,fontFamily:font,cursor:"pointer" }}>
@@ -1888,8 +1997,16 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
         />
       )}
 
+      {verAniv && (
+        <AniversariantesMes
+          escolas={escolas}
+          onFechar={()=>setVerAniv(false)}
+          onAbrir={(e)=>{ setSel(e); setTab("cont"); setVerAniv(false); }}
+        />
+      )}
+
       {/* Layout principal */}
-      {!verContratos && (
+      {!verContratos && !verAniv && (
       <div style={{ maxWidth:1400,margin:"0 auto",padding:"0 clamp(16px,4vw,40px) 40px",display:"grid",gridTemplateColumns:sel?"minmax(300px,380px) 1fr":"1fr",gap:20,alignItems:"start" }}>
         {/* Lista */}
         <div style={{ background:"#fff",borderRadius:6,overflow:"hidden",position:"sticky",top:0 }}>
