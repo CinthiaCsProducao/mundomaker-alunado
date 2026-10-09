@@ -26,6 +26,21 @@ const PERIOD_OPTS = ["Semanal", "Quinzenal", "Mensal"];
 const SERIES_KEYS = ["ei","s1","s2","s3","s4","s5","s6","s7","s8","s9","em1","em2","em3"];
 const SERIES_LABEL = { ei:"Ed. Infantil",s1:"1º ano",s2:"2º ano",s3:"3º ano",s4:"4º ano",s5:"5º ano",s6:"6º ano",s7:"7º ano",s8:"8º ano",s9:"9º ano",em1:"1º EM",em2:"2º EM",em3:"3º EM" };
 
+// Aniversário guardado só com dia e mês: "MM-DD". Também lê o formato antigo
+// "AAAA-MM-DD" de datas já salvas.
+function lerAniversario(v) {
+  const m = /^(?:\d{4}-)?(\d{2})-(\d{2})$/.exec(v || "");
+  if (!m) return null;
+  const mes = +m[1] - 1, dia = +m[2];
+  if (mes < 0 || mes > 11 || dia < 1 || dia > 31) return null;
+  return { mes, dia };
+}
+function fmtAniversario(v) {
+  const a = lerAniversario(v);
+  return a ? `${String(a.dia).padStart(2,"0")}/${String(a.mes+1).padStart(2,"0")}` : "—";
+}
+const MESES_ANIV = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
 function gerarId(nome) {
   return nome.toLowerCase()
     .normalize("NFD").replace(/[̀-ͯ]/g,"")
@@ -76,6 +91,30 @@ function Modal({ title, fields, values, onSave, onClose }) {
               ) : type==="checkbox" ? (
                 <input type="checkbox" checked={!!form[key]} onChange={e=>setForm({...form,[key]:e.target.checked})}
                   style={{ width:18,height:18,accentColor:VERDE,marginTop:4 }}/>
+              ) : type==="diames" ? (
+                (() => {
+                  const a = lerAniversario(form[key]);
+                  const dia = a ? String(a.dia) : "";
+                  const mes = a ? String(a.mes) : "";
+                  const mudar = (d, m) => {
+                    const nd = d !== "" ? d : "";
+                    const nm = m !== "" ? m : "";
+                    setForm({ ...form, [key]: nd !== "" && nm !== "" ? `${String(+nm+1).padStart(2,"0")}-${String(+nd).padStart(2,"0")}` : "" });
+                  };
+                  const sel = { border:"2px solid #DCDDDE",borderRadius:6,padding:"8px 10px",fontSize:14,fontFamily:fontB,textTransform:"none",letterSpacing:0,flex:1 };
+                  return (
+                    <div style={{ display:"flex",gap:8 }}>
+                      <select value={dia} onChange={e=>mudar(e.target.value, mes)} style={sel}>
+                        <option value="">Dia</option>
+                        {Array.from({length:31},(_,i)=>i+1).map(d=><option key={d} value={d}>{d}</option>)}
+                      </select>
+                      <select value={mes} onChange={e=>mudar(dia, e.target.value)} style={{...sel,flex:2}}>
+                        <option value="">Mês</option>
+                        {MESES_ANIV.map((n,i)=><option key={n} value={i}>{n}</option>)}
+                      </select>
+                    </div>
+                  );
+                })()
               ) : (
                 <input type={type} value={form[key]||""} onChange={e=>setForm({...form,[key]:e.target.value})}
                   style={{ border:"2px solid #DCDDDE",borderRadius:6,padding:"8px 10px",fontSize:14,fontFamily:fontB,textTransform:"none",letterSpacing:0 }}/>
@@ -131,7 +170,7 @@ function ListSection({ title, items=[], fields, onAdd, onEdit, onRemove, canWrit
                 <tr key={i} style={{ borderTop:"1px solid #DCDDDE" }}>
                   {fields.map(f=>(
                     <td key={f.key} style={{ padding:"8px 12px",verticalAlign:"top" }}>
-                      {f.type==="checkbox" ? (item[f.key]?"✓":"—") : (item[f.key]||"—")}
+                      {f.type==="checkbox" ? (item[f.key]?"✓":"—") : f.type==="diames" ? fmtAniversario(item[f.key]) : (item[f.key]||"—")}
                     </td>
                   ))}
                   {canWrite && (
@@ -1643,12 +1682,12 @@ function AniversariantesMes({ escolas, onAbrir, onFechar }) {
   escolas
     .filter(e => incluirInativas || e.status === "Ativo")
     .forEach(e => (e.contatos || []).forEach(c => {
-      const v = lerValidade(c.aniversario);
+      const v = lerAniversario(c.aniversario);
       if (v) contatos.push({ escola: e, c, v });
     }));
   const semData = escolas
     .filter(e => incluirInativas || e.status === "Ativo")
-    .reduce((n, e) => n + (e.contatos || []).filter(c => !lerValidade(c.aniversario)).length, 0);
+    .reduce((n, e) => n + (e.contatos || []).filter(c => !lerAniversario(c.aniversario)).length, 0);
 
   const doMes = contatos.filter(x => x.v.mes === mes).sort((a, b) => a.v.dia - b.v.dia || (a.c.nome || "").localeCompare(b.c.nome || "", "pt-BR"));
   const hoje = doMes.filter(x => mes === mesAtual && x.v.dia === agora.getDate()).length;
@@ -1831,7 +1870,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
   const LIST_CONFIGS = {
     contatos: {
       label:"Contatos", singular:"Contato",
-      fields:[{key:"nome",label:"Nome"},{key:"cargo",label:"Cargo"},{key:"email",label:"E-mail"},{key:"telefone",label:"Telefone"},{key:"turma",label:"Turma"},{key:"aniversario",label:"Aniversário",type:"date"}],
+      fields:[{key:"nome",label:"Nome"},{key:"cargo",label:"Cargo"},{key:"email",label:"E-mail"},{key:"telefone",label:"Telefone"},{key:"turma",label:"Turma"},{key:"aniversario",label:"Aniversário",type:"diames"}],
     },
     formacao: {
       label:"Formação", singular:"Formação",
