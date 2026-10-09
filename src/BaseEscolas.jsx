@@ -1527,8 +1527,6 @@ function ContratosVencendo({ escolas, onAbrir, onFechar }) {
   }
 
   const vencidos = doAno.filter(x => situacao(x.v).dias < 0).length;
-  const proximos30 = doAno.filter(x => { const d = situacao(x.v).dias; return d >= 0 && d <= 30; }).length;
-  const proximos90 = doAno.filter(x => { const d = situacao(x.v).dias; return d > 30 && d <= 90; }).length;
 
   const porMes = {};
   doAno.forEach(x => { (porMes[x.v.mes] = porMes[x.v.mes] || []).push(x); });
@@ -1579,8 +1577,6 @@ function ContratosVencendo({ escolas, onAbrir, onFechar }) {
       <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12,marginBottom:20 }}>
         {card(doAno.length, `Contratos em ${ano}`, PRETO)}
         {card(vencidos, "Já vencidos", "#D81E27")}
-        {card(proximos30, "Vencem em até 30 dias", "#FFA300")}
-        {card(proximos90, "Vencem em 31 a 90 dias", "#FFD902")}
         {card(semValidade.length, "Sem validade cadastrada", "#DCDDDE")}
       </div>
 
