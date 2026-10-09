@@ -58,6 +58,32 @@ function pendencias(s) {
   return items;
 }
 
+// Campo de dia + mês (sem ano). Guarda o que já foi escolhido enquanto o outro
+// seletor ainda está vazio, e só grava "MM-DD" quando os dois estão preenchidos.
+function CampoDiaMes({ value, onChange }) {
+  const inicial = lerAniversario(value);
+  const [dia, setDia] = useState(inicial ? String(inicial.dia) : "");
+  const [mes, setMes] = useState(inicial ? String(inicial.mes) : "");
+
+  function mudar(d, m) {
+    setDia(d); setMes(m);
+    onChange(d !== "" && m !== "" ? `${String(+m + 1).padStart(2,"0")}-${String(+d).padStart(2,"0")}` : "");
+  }
+  const sel = { border:"2px solid #DCDDDE",borderRadius:6,padding:"8px 10px",fontSize:14,fontFamily:fontB,textTransform:"none",letterSpacing:0,flex:1 };
+  return (
+    <div style={{ display:"flex",gap:8 }}>
+      <select value={dia} onChange={e=>mudar(e.target.value, mes)} style={sel}>
+        <option value="">Dia</option>
+        {Array.from({length:31},(_,i)=>i+1).map(d=><option key={d} value={d}>{d}</option>)}
+      </select>
+      <select value={mes} onChange={e=>mudar(dia, e.target.value)} style={{...sel,flex:2}}>
+        <option value="">Mês</option>
+        {MESES_ANIV.map((n,i)=><option key={n} value={i}>{n}</option>)}
+      </select>
+    </div>
+  );
+}
+
 // ── Modal genérico ──────────────────────────────────────────────
 function Modal({ title, fields, values, onSave, onClose }) {
   const [form, setForm] = useState(() => {
@@ -92,29 +118,7 @@ function Modal({ title, fields, values, onSave, onClose }) {
                 <input type="checkbox" checked={!!form[key]} onChange={e=>setForm({...form,[key]:e.target.checked})}
                   style={{ width:18,height:18,accentColor:VERDE,marginTop:4 }}/>
               ) : type==="diames" ? (
-                (() => {
-                  const a = lerAniversario(form[key]);
-                  const dia = a ? String(a.dia) : "";
-                  const mes = a ? String(a.mes) : "";
-                  const mudar = (d, m) => {
-                    const nd = d !== "" ? d : "";
-                    const nm = m !== "" ? m : "";
-                    setForm({ ...form, [key]: nd !== "" && nm !== "" ? `${String(+nm+1).padStart(2,"0")}-${String(+nd).padStart(2,"0")}` : "" });
-                  };
-                  const sel = { border:"2px solid #DCDDDE",borderRadius:6,padding:"8px 10px",fontSize:14,fontFamily:fontB,textTransform:"none",letterSpacing:0,flex:1 };
-                  return (
-                    <div style={{ display:"flex",gap:8 }}>
-                      <select value={dia} onChange={e=>mudar(e.target.value, mes)} style={sel}>
-                        <option value="">Dia</option>
-                        {Array.from({length:31},(_,i)=>i+1).map(d=><option key={d} value={d}>{d}</option>)}
-                      </select>
-                      <select value={mes} onChange={e=>mudar(dia, e.target.value)} style={{...sel,flex:2}}>
-                        <option value="">Mês</option>
-                        {MESES_ANIV.map((n,i)=><option key={n} value={i}>{n}</option>)}
-                      </select>
-                    </div>
-                  );
-                })()
+                <CampoDiaMes value={form[key]} onChange={v=>setForm(f=>({...f,[key]:v}))} />
               ) : (
                 <input type={type} value={form[key]||""} onChange={e=>setForm({...form,[key]:e.target.value})}
                   style={{ border:"2px solid #DCDDDE",borderRadius:6,padding:"8px 10px",fontSize:14,fontFamily:fontB,textTransform:"none",letterSpacing:0 }}/>
