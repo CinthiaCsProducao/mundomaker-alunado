@@ -1486,6 +1486,154 @@ function ReuniaoTab({ escola, autor, onSave }) {
 }
 
 // ── Componente principal ─────────────────────────────────────────
+// ── Contratos a vencer ──────────────────────────────────────────
+const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+// "YYYY-MM-DD" -> { ano, mes (0-11), dia, data: Date local }
+function lerValidade(v) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v || "");
+  if (!m) return null;
+  const ano = +m[1], mes = +m[2] - 1, dia = +m[3];
+  return { ano, mes, dia, data: new Date(ano, mes, dia) };
+}
+
+function fmtData(v) {
+  const d = lerValidade(v);
+  return d ? `${String(d.dia).padStart(2,"0")}/${String(d.mes+1).padStart(2,"0")}/${d.ano}` : "—";
+}
+
+function ContratosVencendo({ escolas, onAbrir, onFechar }) {
+  // O ano padrão é sempre o ano corrente: na virada do ano a lista passa
+  // sozinha para os contratos do novo ano, lendo a "Validade" de cada escola.
+  const anoAtual = new Date().getFullYear();
+  const [ano, setAno] = useState(anoAtual);
+  const [incluirInativas, setIncluirInativas] = useState(false);
+
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+
+  const base = escolas.filter(e => incluirInativas || e.status === "Ativo");
+  const comValidade = base.map(e => ({ e, v: lerValidade(e.validade) })).filter(x => x.v);
+  const semValidade = base.filter(e => !lerValidade(e.validade));
+
+  const anos = [...new Set([anoAtual - 1, anoAtual, anoAtual + 1, ...comValidade.map(x => x.v.ano)])].sort();
+  const doAno = comValidade.filter(x => x.v.ano === ano).sort((a, b) => a.v.data - b.v.data);
+
+  function situacao(v) {
+    const dias = Math.round((v.data - hoje) / 86400000);
+    if (dias < 0)   return { txt: `Vencido há ${-dias} dia${dias === -1 ? "" : "s"}`, cor: "#D81E27", bg: "rgba(216,30,39,.12)", dias };
+    if (dias <= 30) return { txt: dias === 0 ? "Vence hoje" : `Vence em ${dias} dia${dias === 1 ? "" : "s"}`, cor: "#B45309", bg: "rgba(255,163,0,.2)", dias };
+    if (dias <= 90) return { txt: `Vence em ${dias} dias`, cor: "#8a6d00", bg: "rgba(255,217,2,.25)", dias };
+    return { txt: "No prazo", cor: "#148A00", bg: "rgba(57,223,24,.18)", dias };
+  }
+
+  const vencidos = doAno.filter(x => situacao(x.v).dias < 0).length;
+  const proximos30 = doAno.filter(x => { const d = situacao(x.v).dias; return d >= 0 && d <= 30; }).length;
+  const proximos90 = doAno.filter(x => { const d = situacao(x.v).dias; return d > 30 && d <= 90; }).length;
+
+  const porMes = {};
+  doAno.forEach(x => { (porMes[x.v.mes] = porMes[x.v.mes] || []).push(x); });
+
+  function exportarCSV() {
+    const linhas = [["Escola","Tipo","Cluster","Validade","Situação","Contrato (alunos)","E-mail","Telefone","Resp. Legal"]];
+    doAno.forEach(({ e, v }) => linhas.push([
+      e.nome, e.tipo, e.cluster, fmtData(e.validade), situacao(v).txt,
+      e.contratoAlunado, e.email, e.telefone || e.celular, e.respLegal,
+    ].map(c => c ?? "")));
+    const csv = "﻿" + linhas.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `Contratos_vencimento_${ano}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  const card = (valor, rotulo, cor) => (
+    <div style={{ background:"#fff",borderRadius:6,padding:"16px 20px",borderTop:`4px solid ${cor}` }}>
+      <div style={{ fontSize:30,fontWeight:800,fontFamily:font,lineHeight:1 }}>{valor}</div>
+      <div style={{ fontSize:11,fontWeight:700,fontFamily:font,letterSpacing:".05em",textTransform:"uppercase",color:"#6D6E71",marginTop:4 }}>{rotulo}</div>
+    </div>
+  );
+
+  return (
+    <div style={{ maxWidth:1400,margin:"0 auto",padding:"0 clamp(16px,4vw,40px) 40px" }}>
+      <div style={{ display:"flex",gap:12,alignItems:"center",flexWrap:"wrap",marginBottom:16 }}>
+        <button onClick={onFechar}
+          style={{ background:"none",border:"2px solid #DCDDDE",borderRadius:6,padding:"8px 14px",fontSize:13,fontWeight:700,fontFamily:font,cursor:"pointer" }}>
+          ← Voltar à lista
+        </button>
+        <h2 style={{ margin:0,fontSize:22,fontWeight:800,fontFamily:font }}>Contratos a vencer em</h2>
+        <select value={ano} onChange={e=>setAno(+e.target.value)}
+          style={{ background:"#fff",border:"2px solid #DCDDDE",borderRadius:6,padding:"8px 12px",fontFamily:font,fontSize:16,fontWeight:800,cursor:"pointer" }}>
+          {anos.map(a => <option key={a} value={a}>{a}{a === anoAtual ? " (ano atual)" : ""}</option>)}
+        </select>
+        <label style={{ display:"flex",alignItems:"center",gap:6,fontSize:13,fontFamily:fontB,cursor:"pointer" }}>
+          <input type="checkbox" checked={incluirInativas} onChange={e=>setIncluirInativas(e.target.checked)} />
+          Incluir escolas inativas
+        </label>
+        <button onClick={exportarCSV} disabled={!doAno.length}
+          style={{ marginLeft:"auto",background:VERDE,color:PRETO,border:"none",borderRadius:6,padding:"9px 16px",fontSize:13,fontWeight:800,fontFamily:font,cursor:doAno.length?"pointer":"not-allowed",opacity:doAno.length?1:.5 }}>
+          ↓ Exportar CSV
+        </button>
+      </div>
+
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12,marginBottom:20 }}>
+        {card(doAno.length, `Contratos em ${ano}`, PRETO)}
+        {card(vencidos, "Já vencidos", "#D81E27")}
+        {card(proximos30, "Vencem em até 30 dias", "#FFA300")}
+        {card(proximos90, "Vencem em 31 a 90 dias", "#FFD902")}
+        {card(semValidade.length, "Sem validade cadastrada", "#DCDDDE")}
+      </div>
+
+      {doAno.length === 0 ? (
+        <div style={{ background:"#fff",borderRadius:6,padding:40,textAlign:"center",color:"#888",fontFamily:fontB }}>
+          Nenhuma escola com contrato vencendo em {ano}.
+        </div>
+      ) : (
+        Object.keys(porMes).map(Number).sort((a, b) => a - b).map(m => (
+          <div key={m} style={{ background:"#fff",borderRadius:6,overflow:"hidden",marginBottom:14 }}>
+            <div style={{ background:"#231F20",color:"#fff",padding:"10px 18px",fontFamily:font,fontWeight:800,fontSize:13,letterSpacing:".05em",textTransform:"uppercase",display:"flex",justifyContent:"space-between" }}>
+              <span>{MESES[m]} de {ano}</span>
+              <span style={{ color:VERDE }}>{porMes[m].length} contrato{porMes[m].length > 1 ? "s" : ""}</span>
+            </div>
+            {porMes[m].map(({ e, v }) => {
+              const s = situacao(v);
+              return (
+                <div key={e.id} onClick={()=>onAbrir(e)}
+                  style={{ display:"grid",gridTemplateColumns:"90px 1fr auto",gap:14,alignItems:"center",padding:"12px 18px",borderBottom:"1px solid #DCDDDE",cursor:"pointer" }}>
+                  <b style={{ fontFamily:font,fontSize:14 }}>{fmtData(e.validade)}</b>
+                  <span>
+                    <b style={{ display:"block",fontSize:14,fontFamily:font }}>{e.nome}</b>
+                    <small style={{ color:"#6D6E71",fontSize:12 }}>
+                      {[e.tipo, e.cluster, e.contratoAlunado ? `${e.contratoAlunado} alunos` : null, e.email, e.telefone || e.celular, e.status === "Inativo" ? "Inativa" : null].filter(Boolean).join(" · ")}
+                    </small>
+                  </span>
+                  <span style={{ fontSize:11,fontWeight:700,fontFamily:font,padding:"4px 10px",borderRadius:999,background:s.bg,color:s.cor,whiteSpace:"nowrap" }}>{s.txt}</span>
+                </div>
+              );
+            })}
+          </div>
+        ))
+      )}
+
+      {semValidade.length > 0 && (
+        <details style={{ background:"#fff",borderRadius:6,padding:"12px 18px",marginTop:6 }}>
+          <summary style={{ cursor:"pointer",fontFamily:font,fontWeight:700,fontSize:13 }}>
+            {semValidade.length} escola{semValidade.length > 1 ? "s" : ""} sem a validade do contrato cadastrada
+          </summary>
+          <div style={{ marginTop:10,display:"flex",flexWrap:"wrap",gap:8 }}>
+            {semValidade.map(e => (
+              <button key={e.id} onClick={()=>onAbrir(e)}
+                style={{ background:"#F1F2F2",border:"none",borderRadius:999,padding:"5px 12px",fontSize:12,fontFamily:fontB,cursor:"pointer" }}>
+                {e.nome}
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
 export default function BaseEscolas({ onVoltar, equipeLogada }) {
   const [escolas, setEscolas]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -1499,6 +1647,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
   const [confirm, setConfirm]     = useState(null);
   const [, setSalvando]   = useState(false);
   const [novaModal, setNovaModal] = useState(false);
+  const [verContratos, setVerContratos] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -1725,13 +1874,26 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
             {opts.map(o=><option key={o}>{o}</option>)}
           </select>
         ))}
+        <button onClick={()=>setVerContratos(v=>!v)}
+          style={{ background:verContratos?PRETO:"#fff",color:verContratos?"#fff":PRETO,border:"2px solid "+(verContratos?PRETO:"#DCDDDE"),borderRadius:6,padding:"9px 16px",fontSize:14,fontWeight:800,fontFamily:font,cursor:"pointer" }}>
+          📅 Contratos a vencer
+        </button>
         <button onClick={()=>setNovaModal(true)}
           style={{ background:VERDE,color:PRETO,border:"none",borderRadius:6,padding:"10px 16px",fontSize:14,fontWeight:800,fontFamily:font,cursor:"pointer" }}>
           + Nova Escola
         </button>
       </div>
 
+      {verContratos && (
+        <ContratosVencendo
+          escolas={escolas}
+          onFechar={()=>setVerContratos(false)}
+          onAbrir={(e)=>{ setSel(e); setTab("cad"); setVerContratos(false); }}
+        />
+      )}
+
       {/* Layout principal */}
+      {!verContratos && (
       <div style={{ maxWidth:1400,margin:"0 auto",padding:"0 clamp(16px,4vw,40px) 40px",display:"grid",gridTemplateColumns:sel?"minmax(300px,380px) 1fr":"1fr",gap:20,alignItems:"start" }}>
         {/* Lista */}
         <div style={{ background:"#fff",borderRadius:6,overflow:"hidden",position:"sticky",top:0 }}>
@@ -1826,6 +1988,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
           </div>
         )}
       </div>
+      )}
 
       {/* Modal edição */}
       {modal && (
