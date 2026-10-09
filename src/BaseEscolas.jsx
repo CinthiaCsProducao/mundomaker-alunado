@@ -1726,7 +1726,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
   const LIST_CONFIGS = {
     contatos: {
       label:"Contatos", singular:"Contato",
-      fields:[{key:"nome",label:"Nome"},{key:"cargo",label:"Cargo"},{key:"email",label:"E-mail"},{key:"telefone",label:"Telefone"},{key:"turma",label:"Turma"},{key:"fonte",label:"Fonte"}],
+      fields:[{key:"nome",label:"Nome"},{key:"cargo",label:"Cargo"},{key:"email",label:"E-mail"},{key:"telefone",label:"Telefone"},{key:"turma",label:"Turma"},{key:"aniversario",label:"Aniversário",type:"date"}],
     },
     formacao: {
       label:"Formação", singular:"Formação",
