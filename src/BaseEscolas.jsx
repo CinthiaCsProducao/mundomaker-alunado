@@ -1928,15 +1928,28 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
   function renderListTab(key, s) {
     const cfg = LIST_CONFIGS[key];
     const items = s[key]||[];
+    // Contatos sempre em ordem alfabética pelo nome. `ordem` guarda a posição
+    // original de cada item, para editar/remover o registro certo.
+    const ordem = items.map((_, i) => i);
+    if (key === "contatos") {
+      ordem.sort((a, b) => {
+        const na = (items[a].nome || "").trim(), nb = (items[b].nome || "").trim();
+        if (!na && nb) return 1;
+        if (na && !nb) return -1;
+        return na.localeCompare(nb, "pt-BR", { sensitivity: "base" });
+      });
+    }
+    const exibidos = ordem.map(i => items[i]);
     return (
       <ListSection
         title={cfg.label}
-        items={items}
+        items={exibidos}
         fields={cfg.fields}
         canWrite={true}
         onAdd={()=>setModal({title:`Adicionar ${cfg.singular || cfg.label}`,fields:cfg.fields,values:{},section:key,listAdd:true})}
-        onEdit={i=>setModal({title:`Editar`,fields:cfg.fields,values:items[i],section:key,listEdit:i})}
-        onRemove={i=>setConfirm({msg:`Remover este item?`,onConfirm:async()=>{
+        onEdit={v=>{ const i = ordem[v]; setModal({title:`Editar`,fields:cfg.fields,values:items[i],section:key,listEdit:i}); }}
+        onRemove={v=>setConfirm({msg:`Remover este item?`,onConfirm:async()=>{
+          const i = ordem[v];
           const newItems=[...items]; newItems.splice(i,1);
           await save(s.id,{[key]:newItems});
           setConfirm(null);
