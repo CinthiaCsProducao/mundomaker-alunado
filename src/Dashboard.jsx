@@ -2135,7 +2135,7 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f5f5f5", fontFamily: font }}>
-      <div style={{ background: "#39DF18", padding: "16px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+      <div className="mm-topo" style={{ background: "#39DF18", padding: "16px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <LogoMM size={44} cor="#111" />
           <div>
@@ -2147,7 +2147,7 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div className="mm-nav" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           {perm.historico && (
             <button onClick={() => setView(view === "historico" ? "dashboard" : "historico")}
               style={{ background: view === "historico" ? "#000" : "rgba(0,0,0,0.12)", color: view === "historico" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>

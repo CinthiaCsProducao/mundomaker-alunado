@@ -11,3 +11,69 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   Adaptação para celular e tablet
+   O sistema usa estilos "inline" em quase tudo; por isso as regras
+   abaixo usam seletores por atributo e classes pontuais (mm-*, be-*).
+   ════════════════════════════════════════════════════════════════ */
+
+img, svg, video, iframe { max-width: 100%; }
+
+/* ── Tablet e celular ───────────────────────────────────────── */
+@media (max-width: 900px) {
+  /* Topo do dashboard: menu em uma linha com rolagem lateral */
+  .mm-topo { padding: 12px 16px !important; }
+  .mm-nav {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    width: 100%;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mm-nav > * { flex-shrink: 0; white-space: nowrap; }
+
+  /* Base de escolas: lista e detalhe em coluna */
+  .be-layout { grid-template-columns: 1fr !important; }
+  .be-layout.tem-sel .be-lista { display: none; }
+  .be-lista { position: static !important; }
+  .be-clusters { margin-left: 0 !important; }
+}
+
+/* ── Celular ────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Formulários e grades de 2 ou 3 colunas viram 1 coluna */
+  [style*="grid-template-columns: 1fr 1fr"],
+  [style*="grid-template-columns: 1fr 1fr 1fr"],
+  [style*="grid-template-columns: 80px 1fr 1fr auto"],
+  [style*="grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Cartões de números: 2 por linha */
+  [style*="grid-template-columns: repeat(4, 1fr)"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Margens laterais menores nos blocos principais */
+  [style*="padding: 32px 20px"] { padding: 20px 12px !important; }
+  [style*="padding: 24px 20px"] { padding: 16px 12px !important; }
+  [style*="padding: 60px 40px"] { padding: 36px 16px !important; }
+
+  /* Campos com 16px evitam o zoom automático do iPhone ao digitar */
+  input, select, textarea { font-size: 16px !important; }
+
+  /* Botões e links mais fáceis de tocar */
+  button { touch-action: manipulation; }
+
+  /* Janelas (modais) ocupam melhor a tela */
+  [style*="position: fixed"][style*="inset: 0"] { padding: 8px !important; }
+
+  /* Tabelas largas rolam para o lado, sem estourar a página */
+  table { font-size: 12px; }
+  [style*="overflow-x: auto"], [style*="overflow-x:auto"] { -webkit-overflow-scrolling: touch; }
+
+  /* Cartões grandes de resumo ficam menores */
+  [style*="font-size: 48px"] { font-size: 34px !important; }
+  [style*="font-size: 40px"] { font-size: 30px !important; }
+}

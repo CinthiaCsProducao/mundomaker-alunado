@@ -1996,7 +1996,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
             <small style={{ fontSize:12,fontWeight:700,fontFamily:font,letterSpacing:".06em",textTransform:"uppercase",color:"#C7C8CA" }}>{escolas.length} escolas · {ativas.length} ativas</small>
           </div>
           {/* Cluster bars */}
-          <div style={{ marginLeft:"auto",display:"flex",gap:8,alignItems:"flex-end",paddingBottom:0 }}>
+          <div className="be-clusters" style={{ marginLeft:"auto",display:"flex",gap:8,alignItems:"flex-end",paddingBottom:0 }}>
             {CLUSTERS.map(([c,cor])=>{
               const count=ativas.filter(e=>e.cluster===c).length;
               const h=28+Math.round(count/maxCount*46);
@@ -2063,9 +2063,9 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
 
       {/* Layout principal */}
       {!verContratos && !verAniv && (
-      <div style={{ maxWidth:1400,margin:"0 auto",padding:"0 clamp(16px,4vw,40px) 40px",display:"grid",gridTemplateColumns:sel?"minmax(300px,380px) 1fr":"1fr",gap:20,alignItems:"start" }}>
+      <div className={"be-layout"+(sel?" tem-sel":"")} style={{ maxWidth:1400,margin:"0 auto",padding:"0 clamp(16px,4vw,40px) 40px",display:"grid",gridTemplateColumns:sel?"minmax(300px,380px) 1fr":"1fr",gap:20,alignItems:"start" }}>
         {/* Lista */}
-        <div style={{ background:"#fff",borderRadius:6,overflow:"hidden",position:"sticky",top:0 }}>
+        <div className="be-lista" style={{ background:"#fff",borderRadius:6,overflow:"hidden",position:"sticky",top:0 }}>
           <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px",borderBottom:"2px dashed #DCDDDE",color:"#6D6E71",fontSize:12,fontWeight:700,fontFamily:font,letterSpacing:".05em",textTransform:"uppercase" }}>
             <span>{filtradas.length} escolas</span>
           </div>
