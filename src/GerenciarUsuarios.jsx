@@ -23,6 +23,21 @@ async function hashSenha(senha) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
 }
 
+// Envia ao usuário um e-mail com o link para criar a própria senha (a senha nunca é enviada por e-mail)
+async function enviarLinkAcesso(email) {
+  const { error } = await supabase.auth.signInWithOtp({
+    email: String(email).trim().toLowerCase(),
+    options: { shouldCreateUser: true, emailRedirectTo: window.location.origin + "/dashboard" },
+  });
+  return error;
+}
+function msgErroEmail(error) {
+  if (!error) return "";
+  return /rate|second|minute/i.test(error.message)
+    ? "limite de e-mails do Supabase atingido. Aguarde um pouco e use o botão \"Enviar acesso\"."
+    : error.message;
+}
+
 const PERM_VAZIO = { historico:false, escolas:false, inspiramaker:false, projecao:false, baseEscolas:false, familias:false, cursoMaker:false, cmProfessor:false, admin:false, popsAreas:[], chamadaEscolas:[] };
 
 // Áreas dos POPs. Valor "*" = todas. Usuário antigo (sem o campo) = todas.
@@ -65,7 +80,6 @@ function ModalUsuario({ usuario, onSave, onClose }) {
     setErro("");
     if (!form.email.trim()) { setErro("E-mail obrigatório."); return; }
     if (!form.nome.trim())  { setErro("Nome obrigatório.");  return; }
-    if (isNovo && !form.senha.trim()) { setErro("Senha obrigatória para novo usuário."); return; }
     setSalvando(true);
     try {
       const payload = {
@@ -75,10 +89,21 @@ function ModalUsuario({ usuario, onSave, onClose }) {
         ativo:      form.ativo,
       };
       if (form.senha.trim()) payload.senha = await hashSenha(form.senha.trim());
+      // Novo usuário sem senha definida: guarda uma senha aleatória (ele cria a dele pelo link do e-mail)
+      if (isNovo && !payload.senha) {
+        const rnd = Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2, "0")).join("");
+        payload.senha = await hashSenha(rnd);
+      }
 
       if (isNovo) {
         const { error } = await supabase.from("usuarios").insert([payload]);
         if (error) throw error;
+        if (payload.ativo) {
+          const errEmail = await enviarLinkAcesso(payload.email);
+          window.alert(errEmail
+            ? `Usuário criado, mas o e-mail não foi enviado: ${msgErroEmail(errEmail)}`
+            : `Usuário criado! Enviamos para ${payload.email} um e-mail com o link para criar a senha.`);
+        }
       } else {
         const { error } = await supabase.from("usuarios").update(payload).eq("id", usuario.id);
         if (error) throw error;
@@ -101,7 +126,7 @@ function ModalUsuario({ usuario, onSave, onClose }) {
         {[
           { label:"Nome",  key:"nome",  type:"text" },
           { label:"E-mail",key:"email", type:"email" },
-          { label: isNovo ? "Senha" : "Nova senha (deixe em branco para manter)", key:"senha", type:"password" },
+          { label: isNovo ? "Senha provisória (opcional: a pessoa cria a dela pelo e-mail)" : "Nova senha (deixe em branco para manter)", key:"senha", type:"password" },
         ].map(f=>(
           <div key={f.key} style={{ marginBottom:14 }}>
             <label style={{ fontSize:11,fontWeight:700,color:"#555",textTransform:"uppercase",letterSpacing:.8,display:"block",marginBottom:5 }}>{f.label}</label>
@@ -193,6 +218,12 @@ export default function GerenciarUsuarios({ onVoltar }) {
   }
   useEffect(() => { carregar(); }, []);
 
+  async function reenviarAcesso(u) {
+    if (!window.confirm(`Enviar para ${u.email} um e-mail com o link para criar ou redefinir a senha?`)) return;
+    const err = await enviarLinkAcesso(u.email);
+    window.alert(err ? `Não foi possível enviar: ${msgErroEmail(err)}` : `E-mail enviado para ${u.email}.`);
+  }
+
   async function toggleAtivo(u) {
     await supabase.from("usuarios").update({ ativo: !u.ativo }).eq("id", u.id);
     carregar();
@@ -251,6 +282,7 @@ export default function GerenciarUsuarios({ onVoltar }) {
                   <td style={{ padding:"12px 16px" }}>
                     <div style={{ display:"flex",gap:6 }}>
                       <button onClick={()=>setModal(u)} style={{ ...btnStyle(false),background:"#F1F2F2",color:PRETO }}>Editar</button>
+                      {u.ativo && <button onClick={()=>reenviarAcesso(u)} style={{ ...btnStyle(false),background:"#F1F2F2",color:PRETO }}>Enviar acesso</button>}
                       <button onClick={()=>toggleAtivo(u)} style={{ ...btnStyle(u.ativo) }}>
                         {u.ativo?"Desativar":"Ativar"}
                       </button>

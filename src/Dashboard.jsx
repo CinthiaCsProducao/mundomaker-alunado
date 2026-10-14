@@ -1701,6 +1701,7 @@ export default function Dashboard() {
   // "Esqueci minha senha": só mostra orientação (a redefinição é feita por um administrador)
   const [senhaStep, setSenhaStep]       = useState("login"); // "login"|"ajuda"
   const [msgLogin, setMsgLogin]         = useState("");
+  const [menuAberto, setMenuAberto]   = useState(false);
   const [profTab, setProfTab]           = useState("");   // professor com acesso a TechLab e Curso Maker
   const [definindoSenha, setDefinindoSenha] = useState(false);
   const [novaSenha, setNovaSenha]       = useState("");
@@ -2136,6 +2137,33 @@ export default function Dashboard() {
     );
   }
 
+  const itensMenu = [
+    { grupo: "Geral", itens: [
+      { id: "dashboard", label: "Início", show: true },
+      { id: "historico", label: `Histórico de Ciclos${ciclosHist.length > 0 ? ` (${ciclosHist.length})` : ""}`, show: !!perm.historico },
+      { id: "escolas", label: "Escolas", show: !!perm.escolas },
+    ] },
+    { grupo: "Produção", itens: [
+      { id: "inspiramaker", label: "Inspiramaker", show: !!perm.inspiramaker },
+      { id: "projecao", label: "Projeção de Material", show: !!perm.projecao },
+      { id: "cortes", label: "Conf. Cortes", show: !!perm.projecao },
+      { id: "romaneio", label: "Romaneio", show: true },
+      { id: "histromaneios", label: "Hist. Romaneios", show: true },
+    ] },
+    { grupo: "Cadastros", itens: [
+      { id: "baseescolas", label: "Base Escolas", show: !!perm.baseEscolas },
+      { id: "pops", label: "POPs", show: true },
+    ] },
+    { grupo: "Cursos", itens: [
+      { id: "familias", label: "TechLab", show: !!(perm.familias || isAdmin) },
+      { id: "cursomaker", label: "Curso Maker", show: !!(perm.cursoMaker || isAdmin) },
+    ] },
+    { grupo: "Administração", itens: [
+      { id: "usuarios", label: "Usuários", show: isAdmin },
+    ] },
+  ].map(g => ({ ...g, itens: g.itens.filter(i => i.show) })).filter(g => g.itens.length > 0);
+  const itemAtual = itensMenu.flatMap(g => g.itens).find(i => i.id === view);
+
   return (
     <div style={{ minHeight: "100vh", background: "#f5f5f5", fontFamily: font }}>
       <div className="mm-topo" style={{ background: "#39DF18", padding: "16px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
@@ -2150,73 +2178,32 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-        <div className="mm-nav" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          {perm.historico && (
-            <button onClick={() => setView(view === "historico" ? "dashboard" : "historico")}
-              style={{ background: view === "historico" ? "#000" : "rgba(0,0,0,0.12)", color: view === "historico" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-              Histórico de Ciclos {ciclosHist.length > 0 && `(${ciclosHist.length})`}
+        <div className="mm-acoes" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ position: "relative" }}>
+            <button onClick={() => setMenuAberto(m => !m)}
+              style={{ background: "#000", color: "#fff", border: "none", borderRadius: 4, padding: "9px 18px", fontSize: 13, fontWeight: 800, fontFamily: font, cursor: "pointer", whiteSpace: "nowrap" }}>
+              ☰ Menu{itemAtual && itemAtual.id !== "dashboard" ? ` · ${itemAtual.label}` : ""}
             </button>
-          )}
-          {perm.escolas && (
-            <button onClick={() => setView(view === "escolas" ? "dashboard" : "escolas")}
-              style={{ background: view === "escolas" ? "#000" : "rgba(0,0,0,0.12)", color: view === "escolas" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-              Escolas
-            </button>
-          )}
-          {perm.inspiramaker && (
-            <button onClick={() => setView(view === "inspiramaker" ? "dashboard" : "inspiramaker")}
-              style={{ background: view === "inspiramaker" ? "#000" : "rgba(0,0,0,0.12)", color: view === "inspiramaker" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-              Inspiramaker
-            </button>
-          )}
-          {perm.projecao && (
-            <button onClick={() => setView(view === "projecao" ? "dashboard" : "projecao")}
-              style={{ background: view === "projecao" ? "#000" : "rgba(0,0,0,0.12)", color: view === "projecao" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-              Projeção de Material
-            </button>
-          )}
-          {perm.baseEscolas && (
-            <button onClick={() => setView(view === "baseescolas" ? "dashboard" : "baseescolas")}
-              style={{ background: view === "baseescolas" ? "#000" : "rgba(0,0,0,0.12)", color: view === "baseescolas" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-              Base Escolas
-            </button>
-          )}
-          {perm.projecao && (
-            <button onClick={() => setView(view === "cortes" ? "dashboard" : "cortes")}
-              style={{ background: view === "cortes" ? "#000" : "rgba(0,0,0,0.12)", color: view === "cortes" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-              Conf. Cortes
-            </button>
-          )}
-          <button onClick={() => setView(view === "romaneio" ? "dashboard" : "romaneio")}
-            style={{ background: view === "romaneio" ? "#000" : "rgba(0,0,0,0.12)", color: view === "romaneio" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-            Romaneio
-          </button>
-          <button onClick={() => setView(view === "histromaneios" ? "dashboard" : "histromaneios")}
-            style={{ background: view === "histromaneios" ? "#000" : "rgba(0,0,0,0.12)", color: view === "histromaneios" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-            Hist. Romaneios
-          </button>
-          <button onClick={() => setView(view === "pops" ? "dashboard" : "pops")}
-            style={{ background: view === "pops" ? "#000" : "rgba(0,0,0,0.12)", color: view === "pops" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-            POPs
-          </button>
-          {(perm.familias || isAdmin) && (
-            <button onClick={() => setView(view === "familias" ? "dashboard" : "familias")}
-              style={{ background: view === "familias" ? "#000" : "rgba(0,0,0,0.12)", color: view === "familias" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-              TechLab
-            </button>
-          )}
-          {(perm.cursoMaker || isAdmin) && (
-            <button onClick={() => setView(view === "cursomaker" ? "dashboard" : "cursomaker")}
-              style={{ background: view === "cursomaker" ? "#000" : "rgba(0,0,0,0.12)", color: view === "cursomaker" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-              Curso Maker
-            </button>
-          )}
-          {isAdmin && (
-            <button onClick={() => setView(view === "usuarios" ? "dashboard" : "usuarios")}
-              style={{ background: view === "usuarios" ? "#000" : "rgba(0,0,0,0.12)", color: view === "usuarios" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-              Usuários
-            </button>
-          )}
+            {menuAberto && (
+              <>
+                <div onClick={() => setMenuAberto(false)} style={{ position: "fixed", inset: 0, zIndex: 900 }} />
+                <div style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, zIndex: 901, background: "#fff", borderRadius: 8, boxShadow: "0 8px 28px rgba(0,0,0,.25)", minWidth: 250, maxHeight: "75vh", overflowY: "auto", padding: "6px 0" }}>
+                  {itensMenu.map(g => (
+                    <div key={g.grupo}>
+                      <div style={{ padding: "10px 18px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: "#888", fontFamily: font }}>{g.grupo}</div>
+                      {g.itens.map(i => (
+                        <button key={i.id} onClick={() => { setView(i.id); setMenuAberto(false); }}
+                          style={{ display: "block", width: "100%", textAlign: "left", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: 14, fontFamily: font,
+                            background: view === i.id ? "#39DF18" : "#fff", color: "#111", fontWeight: view === i.id ? 800 : 600 }}>
+                          {i.label}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           {isAdmin && cicloAtivo && (
             <button onClick={() => setModalCiclo(true)}
               style={{ background: "#e53935", color: "#fff", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
