@@ -12,6 +12,8 @@ const PERMISSOES_LABELS = [
   { key: "projecao",     label: "Projeção de Material" },
   { key: "baseEscolas",  label: "Base de Escolas" },
   { key: "familias",     label: "TechLab (alunos, responsáveis e valores)" },
+  { key: "cursoMaker",   label: "Curso Maker (alunos, pagamentos e chamada)" },
+  { key: "cmProfessor",  label: "Curso Maker: professor (vê só a chamada das suas turmas)" },
   { key: "admin",        label: "Admin (gerenciar usuários + encerrar ciclo)" },
 ];
 
@@ -21,7 +23,7 @@ async function hashSenha(senha) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
 }
 
-const PERM_VAZIO = { historico:false, escolas:false, inspiramaker:false, projecao:false, baseEscolas:false, familias:false, admin:false, popsAreas:[], chamadaEscolas:[] };
+const PERM_VAZIO = { historico:false, escolas:false, inspiramaker:false, projecao:false, baseEscolas:false, familias:false, cursoMaker:false, cmProfessor:false, admin:false, popsAreas:[], chamadaEscolas:[] };
 
 // Áreas dos POPs. Valor "*" = todas. Usuário antigo (sem o campo) = todas.
 const AREAS_POPS = ["CS", "Pedagógico", "Financeiro", "Produção", "Diretoria", "Comercial", "Núcleo Técnico"];

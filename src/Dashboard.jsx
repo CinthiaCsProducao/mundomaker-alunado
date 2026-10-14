@@ -7,6 +7,7 @@ import RomaneioTab from "./romaneio-tab";
 import HistoricoRomaneios from "./HistoricoRomaneios";
 import PopsDocumentos from "./PopsDocumentos";
 import Familias from "./Familias";
+import CursoMaker from "./CursoMaker";
 import { supabase } from "./supabaseClient";
 
 // Detecta (antes do Supabase limpar a URL) se a pessoa chegou por um link enviado por e-mail
@@ -1700,6 +1701,7 @@ export default function Dashboard() {
   // "Esqueci minha senha": só mostra orientação (a redefinição é feita por um administrador)
   const [senhaStep, setSenhaStep]       = useState("login"); // "login"|"ajuda"
   const [msgLogin, setMsgLogin]         = useState("");
+  const [profTab, setProfTab]           = useState("");   // professor com acesso a TechLab e Curso Maker
   const [definindoSenha, setDefinindoSenha] = useState(false);
   const [novaSenha, setNovaSenha]       = useState("");
   const [novaSenha2, setNovaSenha2]     = useState("");
@@ -2011,7 +2013,9 @@ export default function Dashboard() {
   const perm    = equipeLogada?.permissoes || {};
   const isAdmin = perm.admin === true;
   // Professor: só tem escolas de chamada liberadas (sem nenhuma outra permissão)
-  const isProfessor = !isAdmin && !perm.familias && Array.isArray(perm.chamadaEscolas) && perm.chamadaEscolas.length > 0;
+  const profTL = !isAdmin && !perm.familias && Array.isArray(perm.chamadaEscolas) && perm.chamadaEscolas.length > 0;
+  const profCM = !isAdmin && !perm.cursoMaker && perm.cmProfessor === true;
+  const isProfessor = !perm.familias && !perm.cursoMaker && (profTL || profCM);
 
   const inpLogin = { width: "100%", padding: "11px 14px", border: "1.5px solid #ddd", borderRadius: 4, fontSize: 14, fontFamily: font, boxSizing: "border-box" };
 
@@ -2115,9 +2119,22 @@ export default function Dashboard() {
     </div>
   );
 
-  if (isProfessor) return (
-    <Familias modoProfessor onSair={handleLogout} nomeUsuario={equipeLogada?.equipe} />
-  );
+  if (isProfessor) {
+    const ambos = profTL && profCM;
+    const aba = ambos ? (profTab || "tl") : profCM ? "cm" : "tl";
+    const tabBtn = (id, nome) => (
+      <button onClick={() => setProfTab(id)}
+        style={{ background: aba === id ? "#39DF18" : "rgba(255,255,255,.12)", color: aba === id ? "#231F20" : "#fff", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 800, fontFamily: font, cursor: "pointer" }}>{nome}</button>
+    );
+    return (
+      <div>
+        {ambos && <div style={{ background: "#231F20", padding: "10px clamp(16px,4vw,40px) 0", display: "flex", gap: 8 }}>{tabBtn("tl", "TechLab")}{tabBtn("cm", "Curso Maker")}</div>}
+        {aba === "cm"
+          ? <CursoMaker modoProfessor onSair={handleLogout} nomeUsuario={equipeLogada?.equipe} />
+          : <Familias modoProfessor onSair={handleLogout} nomeUsuario={equipeLogada?.equipe} />}
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#f5f5f5", fontFamily: font }}>
@@ -2186,6 +2203,12 @@ export default function Dashboard() {
             <button onClick={() => setView(view === "familias" ? "dashboard" : "familias")}
               style={{ background: view === "familias" ? "#000" : "rgba(0,0,0,0.12)", color: view === "familias" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
               TechLab
+            </button>
+          )}
+          {(perm.cursoMaker || isAdmin) && (
+            <button onClick={() => setView(view === "cursomaker" ? "dashboard" : "cursomaker")}
+              style={{ background: view === "cursomaker" ? "#000" : "rgba(0,0,0,0.12)", color: view === "cursomaker" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
+              Curso Maker
             </button>
           )}
           {isAdmin && (
@@ -2258,6 +2281,10 @@ export default function Dashboard() {
 
       {view === "familias" && (perm.familias || isAdmin) && (
         <Familias onVoltar={() => setView("dashboard")} podeExcluir={isAdmin} />
+      )}
+
+      {view === "cursomaker" && (perm.cursoMaker || isAdmin) && (
+        <CursoMaker onVoltar={() => setView("dashboard")} podeExcluir={isAdmin} />
       )}
 
       {view === "pops" && (
