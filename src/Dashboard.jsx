@@ -2185,7 +2185,7 @@ export default function Dashboard() {
           {(perm.familias || isAdmin) && (
             <button onClick={() => setView(view === "familias" ? "dashboard" : "familias")}
               style={{ background: view === "familias" ? "#000" : "rgba(0,0,0,0.12)", color: view === "familias" ? "#fff" : "#000", border: "none", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>
-              Famílias
+              TechLab
             </button>
           )}
           {isAdmin && (
@@ -2257,7 +2257,7 @@ export default function Dashboard() {
       )}
 
       {view === "familias" && (perm.familias || isAdmin) && (
-        <Familias onVoltar={() => setView("dashboard")} />
+        <Familias onVoltar={() => setView("dashboard")} podeExcluir={isAdmin} />
       )}
 
       {view === "pops" && (

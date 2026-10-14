@@ -11,7 +11,7 @@ const PERMISSOES_LABELS = [
   { key: "inspiramaker", label: "Inspiramaker" },
   { key: "projecao",     label: "Projeção de Material" },
   { key: "baseEscolas",  label: "Base de Escolas" },
-  { key: "familias",     label: "Famílias (alunos, responsáveis e valores)" },
+  { key: "familias",     label: "TechLab (alunos, responsáveis e valores)" },
   { key: "admin",        label: "Admin (gerenciar usuários + encerrar ciclo)" },
 ];
 
@@ -141,7 +141,7 @@ function ModalUsuario({ usuario, onSave, onClose }) {
 
         <div style={{ marginBottom:16 }}>
           <label style={{ fontSize:11,fontWeight:700,color:"#555",textTransform:"uppercase",letterSpacing:.8,display:"block",marginBottom:8 }}>Professor: escolas da lista de chamada</label>
-          {escolasFam.length === 0 && <div style={{ fontSize:12,color:"#888" }}>Nenhuma escola cadastrada em Famílias.</div>}
+          {escolasFam.length === 0 && <div style={{ fontSize:12,color:"#888" }}>Nenhuma escola cadastrada no TechLab.</div>}
           {escolasFam.map(e => {
             const marcado = chamadaEscolas.includes(e.id);
             return (

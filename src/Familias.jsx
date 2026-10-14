@@ -510,7 +510,7 @@ function AbaInfo({ escola, recarregarEscolas }) {
 
 // ── Tela principal ──────────────────────────────────────────────
 // modoProfessor: mostra só as escolas liberadas e só a lista de chamada (sem dados financeiros nem contatos)
-export default function Familias({ onVoltar, modoProfessor = false, onSair, nomeUsuario = "" }) {
+export default function Familias({ onVoltar, modoProfessor = false, onSair, nomeUsuario = "", podeExcluir = false }) {
   const [escolas, setEscolas] = useState([]);
   const [alunos, setAlunos] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -518,6 +518,36 @@ export default function Familias({ onVoltar, modoProfessor = false, onSair, nome
   const [selId, setSelId] = useState(null);
   const [aba, setAba] = useState("alunos");
   const [busca, setBusca] = useState("");
+  const [novaEscola, setNovaEscola] = useState(null);   // null = fechado; string = nome sendo digitado
+  const [salvandoEscola, setSalvandoEscola] = useState(false);
+
+  async function criarEscola() {
+    const nome = (novaEscola || "").trim();
+    if (!nome) return;
+    if (escolas.some(e => e.nome.trim().toLowerCase() === nome.toLowerCase())) { alert("Já existe uma escola com esse nome."); return; }
+    const base = nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "escola";
+    let id = base, n = 2;
+    while (escolas.some(e => e.id === id)) id = `${base}-${n++}`;
+    setSalvandoEscola(true);
+    const { error } = await supabase.from("familias_escolas").insert({ id, nome, dados: {} });
+    setSalvandoEscola(false);
+    if (error) { alert("Erro ao criar a escola: " + error.message); return; }
+    setNovaEscola(null);
+    await carregar();
+    setSelId(id); setAba("alunos");
+  }
+
+  async function excluirEscola(e) {
+    const qtd = alunos.filter(a => a.escola_id === e.id).length;
+    const digitado = window.prompt(
+      `Excluir a escola "${e.nome}"?\n\nIsso apaga também ${qtd} aluno(s), as chamadas e as mensalidades dela. Não dá para desfazer.\n\nPara confirmar, digite o nome da escola:`);
+    if (digitado === null) return;
+    if (digitado.trim().toLowerCase() !== e.nome.trim().toLowerCase()) { alert("O nome não confere. Nada foi excluído."); return; }
+    const { error } = await supabase.from("familias_escolas").delete().eq("id", e.id);
+    if (error) { alert("Erro ao excluir: " + error.message); return; }
+    setSelId(null);
+    carregar();
+  }
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -564,7 +594,7 @@ export default function Familias({ onVoltar, modoProfessor = false, onSair, nome
             <button onClick={onVoltar} style={{ background: "none", border: "none", color: "#aaa", fontSize: 12, cursor: "pointer", fontFamily: font, padding: 0, marginBottom: 6, display: "block" }}>← Voltar ao Dashboard</button>
           )}
           <h1 style={{ fontSize: 30, fontWeight: 800, fontFamily: font, color: "#fff", margin: 0, lineHeight: 1 }}>
-            {modoProfessor ? "lista de chamada" : "famílias"}
+            {modoProfessor ? "lista de chamada" : "techlab"}
             <span style={{ display: "block", width: 44, height: 4, background: VERDE, borderRadius: 2, margin: "10px 0 6px" }} />
           </h1>
           <small style={{ fontSize: 12, fontWeight: 700, fontFamily: font, letterSpacing: ".06em", textTransform: "uppercase", color: "#C7C8CA" }}>
@@ -580,6 +610,7 @@ export default function Familias({ onVoltar, modoProfessor = false, onSair, nome
         <div className="be-lista" style={{ background: "#fff", borderRadius: 6, overflow: "hidden" }}>
           <div style={{ padding: "10px 14px", borderBottom: "2px dashed #DCDDDE" }}>
             <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar escola..." style={inp} />
+            {!modoProfessor && <button onClick={() => setNovaEscola("")} style={{ ...btnPrim, width: "100%", marginTop: 8 }}>+ Nova escola</button>}
           </div>
           {carregando ? <div style={{ padding: 24, textAlign: "center", color: "#aaa" }}>Carregando...</div>
             : filtradas.length === 0 ? <div style={{ padding: 24, textAlign: "center", color: "#aaa", fontSize: 13 }}>{modoProfessor ? "Nenhuma escola liberada para você. Fale com a coordenação." : "Nenhuma escola. Rode o SQL de criação e de importação no Supabase."}</div>
@@ -605,7 +636,12 @@ export default function Familias({ onVoltar, modoProfessor = false, onSair, nome
           <div style={{ background: "#fff", borderRadius: 6, overflow: "hidden" }}>
             <div style={{ padding: "20px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
               <h2 style={{ fontSize: 26, fontWeight: 800, fontFamily: font, margin: 0 }}>{sel.nome}</h2>
-              <button onClick={() => setSelId(null)} style={{ background: "none", border: "none", fontSize: 24, cursor: "pointer", color: "#888" }}>×</button>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {podeExcluir && !modoProfessor && (
+                  <button onClick={() => excluirEscola(sel)} style={{ background: "none", border: "2px solid #D81E27", color: "#D81E27", borderRadius: 6, padding: "5px 12px", fontSize: 12, fontWeight: 800, fontFamily: font, cursor: "pointer" }}>Excluir escola</button>
+                )}
+                <button onClick={() => setSelId(null)} style={{ background: "none", border: "none", fontSize: 24, cursor: "pointer", color: "#888" }}>×</button>
+              </div>
             </div>
             <div style={{ display: modoProfessor ? "none" : "flex", gap: 4, padding: "12px 24px 0", borderBottom: "2px dashed #DCDDDE", overflowX: "auto" }}>
               {abas.map(([id, nome]) => (
@@ -624,6 +660,22 @@ export default function Familias({ onVoltar, modoProfessor = false, onSair, nome
           </div>
         )}
       </div>
+
+      {novaEscola !== null && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setNovaEscola(null)}>
+          <form onSubmit={e => { e.preventDefault(); criarEscola(); }} onClick={e => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 8, width: "100%", maxWidth: 420, padding: 24 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, fontFamily: font, marginBottom: 14 }}>Nova escola</div>
+            <label style={lbl}>Nome da escola
+              <input autoFocus value={novaEscola} onChange={e => setNovaEscola(e.target.value)} style={inp} placeholder="Ex.: Escola Exemplo" />
+            </label>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18 }}>
+              <button type="button" onClick={() => setNovaEscola(null)} style={btnSec}>Cancelar</button>
+              <button type="submit" disabled={salvandoEscola || !novaEscola.trim()} style={{ ...btnPrim, opacity: salvandoEscola || !novaEscola.trim() ? .5 : 1 }}>{salvandoEscola ? "Criando..." : "Criar escola"}</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
