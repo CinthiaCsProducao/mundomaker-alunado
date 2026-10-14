@@ -2010,6 +2010,8 @@ export default function Dashboard() {
 
   const perm    = equipeLogada?.permissoes || {};
   const isAdmin = perm.admin === true;
+  // Professor: só tem escolas de chamada liberadas (sem nenhuma outra permissão)
+  const isProfessor = !isAdmin && !perm.familias && Array.isArray(perm.chamadaEscolas) && perm.chamadaEscolas.length > 0;
 
   const inpLogin = { width: "100%", padding: "11px 14px", border: "1.5px solid #ddd", borderRadius: 4, fontSize: 14, fontFamily: font, boxSizing: "border-box" };
 
@@ -2111,6 +2113,10 @@ export default function Dashboard() {
         )}
       </div>
     </div>
+  );
+
+  if (isProfessor) return (
+    <Familias modoProfessor onSair={handleLogout} nomeUsuario={equipeLogada?.equipe} />
   );
 
   return (

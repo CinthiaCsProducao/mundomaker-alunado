@@ -509,7 +509,8 @@ function AbaInfo({ escola, recarregarEscolas }) {
 }
 
 // ── Tela principal ──────────────────────────────────────────────
-export default function Familias({ onVoltar }) {
+// modoProfessor: mostra só as escolas liberadas e só a lista de chamada (sem dados financeiros nem contatos)
+export default function Familias({ onVoltar, modoProfessor = false, onSair, nomeUsuario = "" }) {
   const [escolas, setEscolas] = useState([]);
   const [alunos, setAlunos] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -520,16 +521,22 @@ export default function Familias({ onVoltar }) {
 
   const carregar = useCallback(async () => {
     setErro("");
-    const [e, a] = await Promise.all([
-      supabase.from("familias_escolas").select("*").order("nome"),
-      supabase.from("familias_alunos").select("*"),
-    ]);
+    const [e, a] = modoProfessor
+      ? await Promise.all([supabase.rpc("prof_escolas"), supabase.rpc("prof_alunos")])
+      : await Promise.all([
+          supabase.from("familias_escolas").select("*").order("nome"),
+          supabase.from("familias_alunos").select("*"),
+        ]);
     if (e.error || a.error) setErro("Erro ao carregar: " + (e.error?.message || a.error?.message));
     setEscolas(e.data || []);
-    setAlunos(a.data || []);
+    setAlunos((a.data || []).map(x => modoProfessor ? { ...x, status: "Ativo" } : x));
     setCarregando(false);
-  }, []);
+  }, [modoProfessor]);
   useEffect(() => { carregar(); }, [carregar]);
+  // Professor com uma única escola: já abre direto nela
+  useEffect(() => {
+    if (modoProfessor && escolas.length === 1 && !selId) setSelId(escolas[0].id);
+  }, [modoProfessor, escolas, selId]);
 
   const sel = escolas.find(e => e.id === selId) || null;
   const alunosDaEscola = useMemo(() => alunos.filter(a => a.escola_id === selId), [alunos, selId]);
@@ -542,18 +549,26 @@ export default function Familias({ onVoltar }) {
   const totalAtivos = alunos.filter(a => a.status === "Ativo").length;
 
   const abas = [["alunos", "Famílias"], ["chamada", "Lista de chamada"], ["info", "Informações"]];
+  const abaAtiva = modoProfessor ? "chamada" : aba;
 
   return (
     <div style={{ minHeight: "100vh", background: "#F1F2F2", fontFamily: fontB }}>
       <div style={{ background: PRETO, padding: "0 clamp(16px,4vw,40px)" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto", paddingTop: 20, paddingBottom: 20 }}>
-          <button onClick={onVoltar} style={{ background: "none", border: "none", color: "#aaa", fontSize: 12, cursor: "pointer", fontFamily: font, padding: 0, marginBottom: 6, display: "block" }}>← Voltar ao Dashboard</button>
+          {modoProfessor ? (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: "#C7C8CA", fontFamily: font }}>{nomeUsuario}</span>
+              <button onClick={onSair} style={{ background: VERDE, color: PRETO, border: "none", borderRadius: 4, padding: "6px 14px", fontSize: 12, fontWeight: 800, fontFamily: font, cursor: "pointer" }}>SAIR</button>
+            </div>
+          ) : (
+            <button onClick={onVoltar} style={{ background: "none", border: "none", color: "#aaa", fontSize: 12, cursor: "pointer", fontFamily: font, padding: 0, marginBottom: 6, display: "block" }}>← Voltar ao Dashboard</button>
+          )}
           <h1 style={{ fontSize: 30, fontWeight: 800, fontFamily: font, color: "#fff", margin: 0, lineHeight: 1 }}>
-            famílias
+            {modoProfessor ? "lista de chamada" : "famílias"}
             <span style={{ display: "block", width: 44, height: 4, background: VERDE, borderRadius: 2, margin: "10px 0 6px" }} />
           </h1>
           <small style={{ fontSize: 12, fontWeight: 700, fontFamily: font, letterSpacing: ".06em", textTransform: "uppercase", color: "#C7C8CA" }}>
-            {escolas.length} escolas · {totalAtivos} alunos ativos
+            {escolas.length} escolas{modoProfessor ? "" : ` · ${totalAtivos} alunos ativos`}
           </small>
         </div>
       </div>
@@ -567,18 +582,18 @@ export default function Familias({ onVoltar }) {
             <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar escola..." style={inp} />
           </div>
           {carregando ? <div style={{ padding: 24, textAlign: "center", color: "#aaa" }}>Carregando...</div>
-            : filtradas.length === 0 ? <div style={{ padding: 24, textAlign: "center", color: "#aaa", fontSize: 13 }}>Nenhuma escola. Rode o SQL de criação e de importação no Supabase.</div>
+            : filtradas.length === 0 ? <div style={{ padding: 24, textAlign: "center", color: "#aaa", fontSize: 13 }}>{modoProfessor ? "Nenhuma escola liberada para você. Fale com a coordenação." : "Nenhuma escola. Rode o SQL de criação e de importação no Supabase."}</div>
             : filtradas.map(e => {
               const r = resumo(e.id);
               return (
-                <div key={e.id} onClick={() => { setSelId(e.id); setAba("alunos"); }}
+                <div key={e.id} onClick={() => { setSelId(e.id); setAba(modoProfessor ? "chamada" : "alunos"); }}
                   style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "center", padding: "12px 16px", borderBottom: "1px solid #DCDDDE", cursor: "pointer",
                     background: selId === e.id ? "#F1F2F2" : "transparent", boxShadow: selId === e.id ? "inset 5px 0 0 " + VERDE : "none" }}>
                   <span>
                     <b style={{ display: "block", fontSize: 14, fontFamily: font }}>{e.nome}</b>
                     <small style={{ color: "#6D6E71", fontSize: 12 }}>{r.ativos} aluno{r.ativos !== 1 ? "s" : ""} ativo{r.ativos !== 1 ? "s" : ""}</small>
                   </span>
-                  {r.abertos > 0
+                  {modoProfessor ? null : r.abertos > 0
                     ? <span style={{ fontSize: 11, fontWeight: 700, fontFamily: font, padding: "3px 9px", borderRadius: 999, background: "rgba(255,163,0,.2)", color: "#B45309", whiteSpace: "nowrap" }}>{r.abertos} em aberto</span>
                     : <span style={{ fontSize: 11, fontWeight: 700, fontFamily: font, padding: "3px 9px", borderRadius: 999, background: "rgba(57,223,24,.18)", color: "#148A00" }}>ok</span>}
                 </div>
@@ -592,7 +607,7 @@ export default function Familias({ onVoltar }) {
               <h2 style={{ fontSize: 26, fontWeight: 800, fontFamily: font, margin: 0 }}>{sel.nome}</h2>
               <button onClick={() => setSelId(null)} style={{ background: "none", border: "none", fontSize: 24, cursor: "pointer", color: "#888" }}>×</button>
             </div>
-            <div style={{ display: "flex", gap: 4, padding: "12px 24px 0", borderBottom: "2px dashed #DCDDDE", overflowX: "auto" }}>
+            <div style={{ display: modoProfessor ? "none" : "flex", gap: 4, padding: "12px 24px 0", borderBottom: "2px dashed #DCDDDE", overflowX: "auto" }}>
               {abas.map(([id, nome]) => (
                 <button key={id} onClick={() => setAba(id)}
                   style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: 15, fontWeight: 700, fontFamily: font, whiteSpace: "nowrap",
@@ -602,9 +617,9 @@ export default function Familias({ onVoltar }) {
               ))}
             </div>
             <div style={{ padding: 24 }}>
-              {aba === "alunos" && <AbaAlunos escola={sel} alunos={alunosDaEscola} recarregar={carregar} />}
-              {aba === "chamada" && <AbaChamada escola={sel} alunos={alunosDaEscola} />}
-              {aba === "info" && <AbaInfo escola={sel} recarregarEscolas={carregar} />}
+              {abaAtiva === "alunos" && <AbaAlunos escola={sel} alunos={alunosDaEscola} recarregar={carregar} />}
+              {abaAtiva === "chamada" && <AbaChamada escola={sel} alunos={alunosDaEscola} />}
+              {abaAtiva === "info" && <AbaInfo escola={sel} recarregarEscolas={carregar} />}
             </div>
           </div>
         )}

@@ -21,7 +21,7 @@ async function hashSenha(senha) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
 }
 
-const PERM_VAZIO = { historico:false, escolas:false, inspiramaker:false, projecao:false, baseEscolas:false, familias:false, admin:false, popsAreas:[] };
+const PERM_VAZIO = { historico:false, escolas:false, inspiramaker:false, projecao:false, baseEscolas:false, familias:false, admin:false, popsAreas:[], chamadaEscolas:[] };
 
 // Áreas dos POPs. Valor "*" = todas. Usuário antigo (sem o campo) = todas.
 const AREAS_POPS = ["CS", "Pedagógico", "Financeiro", "Produção", "Diretoria", "Comercial", "Núcleo Técnico"];
@@ -37,6 +37,14 @@ function ModalUsuario({ usuario, onSave, onClose }) {
   });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro]        = useState("");
+  const [escolasFam, setEscolasFam] = useState([]);
+  useEffect(() => {
+    supabase.from("familias_escolas").select("id,nome").order("nome").then(({ data }) => setEscolasFam(data || []));
+  }, []);
+  const chamadaEscolas = form.permissoes.chamadaEscolas || [];
+  function toggleChamadaEscola(id) {
+    setPerm("chamadaEscolas", chamadaEscolas.includes(id) ? chamadaEscolas.filter(x => x !== id) : [...chamadaEscolas, id]);
+  }
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
   function setPerm(k, v) { setForm(f => ({ ...f, permissoes: { ...f.permissoes, [k]: v } })); }
@@ -129,6 +137,23 @@ function ModalUsuario({ usuario, onSave, onClose }) {
             );
           })}
           <div style={{ fontSize:11,color:"#888",marginTop:4 }}>Administradores sempre veem todas as áreas.</div>
+        </div>
+
+        <div style={{ marginBottom:16 }}>
+          <label style={{ fontSize:11,fontWeight:700,color:"#555",textTransform:"uppercase",letterSpacing:.8,display:"block",marginBottom:8 }}>Professor: escolas da lista de chamada</label>
+          {escolasFam.length === 0 && <div style={{ fontSize:12,color:"#888" }}>Nenhuma escola cadastrada em Famílias.</div>}
+          {escolasFam.map(e => {
+            const marcado = chamadaEscolas.includes(e.id);
+            return (
+              <div key={e.id} onClick={()=>toggleChamadaEscola(e.id)} style={{ display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:8 }}>
+                <div style={{ width:18,height:18,border:`2px solid ${marcado?VERDE:"#ccc"}`,borderRadius:3,background:marcado?VERDE:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                  {marcado && <span style={{ fontSize:11,fontWeight:900,color:PRETO }}>✓</span>}
+                </div>
+                <span style={{ fontSize:14,fontFamily:font,color:"#222" }}>{e.nome}</span>
+              </div>
+            );
+          })}
+          <div style={{ fontSize:11,color:"#888",marginTop:4 }}>Para um professor, marque só as escolas aqui e deixe as permissões acima desmarcadas. Ele verá apenas a lista de chamada (nome e turma) dessas escolas.</div>
         </div>
 
         <div onClick={()=>set("ativo",!form.ativo)}
