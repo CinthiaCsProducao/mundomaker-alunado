@@ -7,12 +7,11 @@ import RomaneioTab from "./romaneio-tab";
 import HistoricoRomaneios from "./HistoricoRomaneios";
 import PopsDocumentos from "./PopsDocumentos";
 import Familias from "./Familias";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "./supabaseClient";
 
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.REACT_APP_SUPABASE_ANON_KEY
-);
+// Detecta (antes do Supabase limpar a URL) se a pessoa chegou por um link enviado por e-mail
+const VEIO_DE_LINK = typeof window !== "undefined" &&
+  (/type=(magiclink|recovery|signup|invite)/.test(window.location.hash) || /[?&]code=/.test(window.location.search));
 
 
 const font = "'Circular Std', 'Nunito', 'Helvetica Neue', Arial, sans-serif";
@@ -1700,6 +1699,11 @@ export default function Dashboard() {
   const [manterLogado, setManterLogado] = useState(false);
   // "Esqueci minha senha": só mostra orientação (a redefinição é feita por um administrador)
   const [senhaStep, setSenhaStep]       = useState("login"); // "login"|"ajuda"
+  const [msgLogin, setMsgLogin]         = useState("");
+  const [definindoSenha, setDefinindoSenha] = useState(false);
+  const [novaSenha, setNovaSenha]       = useState("");
+  const [novaSenha2, setNovaSenha2]     = useState("");
+  const [erroSenha, setErroSenha]       = useState("");
   const [escolas, setEscolas]           = useState([]);
   const [todosEnvios, setTodosEnvios]   = useState([]);
   const [loading, setLoading]           = useState(false);
@@ -1711,23 +1715,90 @@ export default function Dashboard() {
   const [ciclosHist, setCiclosHist]     = useState([]);
   const [modalCiclo, setModalCiclo]     = useState(false);
 
+  // Entra no sistema a partir de uma sessão do Supabase Auth (só se o e-mail estiver ativo em "usuarios")
+  async function entrarComSessao(emailAuth) {
+    const { data: usuario } = await supabase
+      .from("usuarios").select("*")
+      .eq("email", String(emailAuth).trim().toLowerCase())
+      .eq("ativo", true)
+      .maybeSingle();
+    if (!usuario) return false;
+    setEquipeLogada({ equipe: usuario.nome, cor: "#39DF18", permissoes: usuario.permissoes || {}, email: usuario.email });
+    setLogado(true);
+    carregarDados();
+    return true;
+  }
+
   useEffect(() => {
-    const saved = localStorage.getItem("mm_dashboard_equipe");
-    if (saved) {
-      try {
-        const equipe = JSON.parse(saved);
-        setLogado(true);
-        setEquipeLogada(equipe);
-        carregarDados();
-      } catch (e) {
-        localStorage.removeItem("mm_dashboard_equipe");
+    async function iniciar() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.email) {
+        const ok = await entrarComSessao(session.user.email);
+        if (ok) {
+          if (VEIO_DE_LINK) setDefinindoSenha(true);
+          return;
+        }
+        await supabase.auth.signOut();
+        setErroLogin("Este e-mail não tem acesso ativo ao sistema.");
+      }
+      const saved = localStorage.getItem("mm_dashboard_equipe");
+      if (saved) {
+        try {
+          const equipe = JSON.parse(saved);
+          setLogado(true);
+          setEquipeLogada(equipe);
+          carregarDados();
+        } catch (e) {
+          localStorage.removeItem("mm_dashboard_equipe");
+        }
       }
     }
+    iniciar();
   }, []); // eslint-disable-line
+
+  async function enviarLinkSenha(e) {
+    e.preventDefault();
+    setErroLogin(""); setMsgLogin("");
+    const em = email.trim().toLowerCase();
+    if (!em) { setErroLogin("Digite seu e-mail."); return; }
+    const { error } = await supabase.auth.signInWithOtp({
+      email: em,
+      options: { shouldCreateUser: true, emailRedirectTo: window.location.origin },
+    });
+    if (error && /rate|second|minute/i.test(error.message)) {
+      setErroLogin("Muitas tentativas. Aguarde alguns minutos e tente de novo.");
+    } else {
+      // Mesma mensagem para qualquer e-mail, para não revelar quem está cadastrado
+      setMsgLogin("Se este e-mail estiver cadastrado, enviamos um link de acesso. Abra o e-mail neste mesmo navegador e clique no link para criar sua senha.");
+    }
+  }
+
+  async function salvarNovaSenha(e) {
+    e.preventDefault();
+    setErroSenha("");
+    if (novaSenha.length < 8) { setErroSenha("A senha precisa ter pelo menos 8 caracteres."); return; }
+    if (novaSenha !== novaSenha2) { setErroSenha("As senhas não conferem."); return; }
+    const { error } = await supabase.auth.updateUser({ password: novaSenha });
+    if (error) { setErroSenha("Não foi possível salvar: " + error.message); return; }
+    setDefinindoSenha(false); setNovaSenha(""); setNovaSenha2("");
+    window.history.replaceState(null, "", window.location.pathname);
+    alert("Senha criada! Nas próximas vezes, entre com seu e-mail e essa senha.");
+  }
 
   async function handleLogin(e) {
     e.preventDefault();
-    setErroLogin("");
+    setErroLogin(""); setMsgLogin("");
+    const emailN = email.trim().toLowerCase();
+    // 1) Login novo (Supabase Auth)
+    const { data: au } = await supabase.auth.signInWithPassword({ email: emailN, password: senha });
+    if (au?.session) {
+      const ok = await entrarComSessao(emailN);
+      if (ok) return;
+      await supabase.auth.signOut();
+      setErroLogin("Este e-mail não tem acesso ativo ao sistema.");
+      return;
+    }
+    // 2) Login antigo (durante a transição)
     try {
       const enc  = new TextEncoder();
       const buf  = await crypto.subtle.digest("SHA-256", enc.encode(senha));
@@ -1913,6 +1984,7 @@ export default function Dashboard() {
   }
 
   function handleLogout() {
+    supabase.auth.signOut();
     localStorage.removeItem("mm_dashboard_equipe");
     setLogado(false);
     setEquipeLogada(null);
@@ -1940,6 +2012,32 @@ export default function Dashboard() {
   const isAdmin = perm.admin === true;
 
   const inpLogin = { width: "100%", padding: "11px 14px", border: "1.5px solid #ddd", borderRadius: 4, fontSize: 14, fontFamily: font, boxSizing: "border-box" };
+
+  if (definindoSenha) return (
+    <div style={{ minHeight: "100vh", background: "#39DF18", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font }}>
+      <form onSubmit={salvarNovaSenha} style={{ background: "#fff", borderRadius: 8, padding: "40px 48px", maxWidth: 400, width: "100%", margin: 20, boxShadow: "0 4px 24px rgba(0,0,0,0.12)" }}>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <LogoMM size={50} cor="#111" />
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#111", marginTop: 8 }}>Crie sua senha</div>
+          <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>Use pelo menos 8 caracteres.</div>
+        </div>
+        {erroSenha && (
+          <div style={{ background: "#fff0f0", border: "1.5px solid #FF3B41", color: "#cc0000", borderRadius: 4, padding: "10px 14px", fontSize: 13, marginBottom: 16 }}>{erroSenha}</div>
+        )}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 6 }}>Nova senha</label>
+          <input type="password" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} style={inpLogin} autoComplete="new-password" />
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 6 }}>Repita a senha</label>
+          <input type="password" value={novaSenha2} onChange={e => setNovaSenha2(e.target.value)} style={inpLogin} autoComplete="new-password" />
+        </div>
+        <button type="submit" style={{ width: "100%", padding: "14px", background: "#39DF18", color: "#000", border: "none", borderRadius: 4, fontSize: 14, fontWeight: 800, fontFamily: font, cursor: "pointer", letterSpacing: 1, textTransform: "uppercase" }}>
+          Salvar senha
+        </button>
+      </form>
+    </div>
+  );
 
   if (!logado) return (
     <div style={{ minHeight: "100vh", background: "#39DF18", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font }}>
@@ -1981,24 +2079,35 @@ export default function Dashboard() {
             <div style={{ textAlign: "center", marginTop: 16 }}>
               <button type="button" onClick={() => setSenhaStep("ajuda")}
                 style={{ background: "none", border: "none", color: "#888", fontSize: 13, cursor: "pointer", textDecoration: "underline", fontFamily: font }}>
-                Esqueci minha senha
+                Primeiro acesso / Esqueci minha senha
               </button>
             </div>
           </form>
         )}
 
-        {/* ── Esqueci minha senha: orientação ── */}
+        {/* ── Criar / redefinir senha por e-mail ── */}
         {senhaStep === "ajuda" && (
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#111", marginBottom: 8 }}>Esqueceu a senha?</div>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 18, lineHeight: 1.5 }}>
-              Por segurança, a senha é redefinida por um administrador. Fale com a coordenação do sistema e peça uma nova senha. Depois do primeiro acesso, ela pode ser trocada.
+          <form onSubmit={enviarLinkSenha}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#111", marginBottom: 8 }}>Criar ou redefinir senha</div>
+            <div style={{ fontSize: 13, color: "#666", marginBottom: 16, lineHeight: 1.5 }}>
+              Digite seu e-mail de acesso. Vamos enviar um link para você criar uma nova senha.
             </div>
-            <button type="button" onClick={() => setSenhaStep("login")}
-              style={{ width: "100%", padding: "13px", background: "#39DF18", color: "#000", border: "none", borderRadius: 4, fontSize: 14, fontWeight: 800, fontFamily: font, cursor: "pointer" }}>
+            {erroLogin && (
+              <div style={{ background: "#fff0f0", border: "1.5px solid #FF3B41", color: "#cc0000", borderRadius: 4, padding: "10px 14px", fontSize: 13, marginBottom: 16 }}>{erroLogin}</div>
+            )}
+            {msgLogin && (
+              <div style={{ background: "#f0fff0", border: "1.5px solid #39DF18", color: "#1a6b08", borderRadius: 4, padding: "10px 14px", fontSize: 13, marginBottom: 16 }}>{msgLogin}</div>
+            )}
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="seu@email.com" style={{ ...inpLogin, marginBottom: 14 }} />
+            <button type="submit" style={{ width: "100%", padding: "13px", background: "#39DF18", color: "#000", border: "none", borderRadius: 4, fontSize: 14, fontWeight: 800, fontFamily: font, cursor: "pointer", marginBottom: 10 }}>
+              Enviar link por e-mail
+            </button>
+            <button type="button" onClick={() => { setSenhaStep("login"); setMsgLogin(""); setErroLogin(""); }}
+              style={{ width: "100%", padding: "11px", background: "none", color: "#555", border: "1.5px solid #ddd", borderRadius: 4, fontSize: 13, fontFamily: font, cursor: "pointer" }}>
               ← Voltar ao login
             </button>
-          </div>
+          </form>
         )}
       </div>
     </div>

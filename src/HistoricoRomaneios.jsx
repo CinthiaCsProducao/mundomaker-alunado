@@ -1,10 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.REACT_APP_SUPABASE_ANON_KEY
-);
+import { supabase } from "./supabaseClient";
 
 const BUCKET = "romaneios";
 const font = "'Archivo', 'Segoe UI', sans-serif";
