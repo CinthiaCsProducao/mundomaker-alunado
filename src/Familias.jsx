@@ -544,8 +544,9 @@ export default function Familias({ onVoltar, modoProfessor = false, onSair, nome
     if (!nome) return;
     if (escolas.some(e => e.nome.trim().toLowerCase() === nome.toLowerCase())) { alert("Já existe uma escola com esse nome."); return; }
     const base = nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "escola";
+    const usados = new Set(escolas.map(e => e.id));
     let id = base, n = 2;
-    while (escolas.some(e => e.id === id)) id = `${base}-${n++}`;
+    while (usados.has(id)) id = `${base}-${n++}`;
     setSalvandoEscola(true);
     const { error } = await supabase.from("familias_escolas").insert({ id, nome, dados: {} });
     setSalvandoEscola(false);
