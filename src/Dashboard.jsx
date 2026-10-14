@@ -38,6 +38,9 @@ function calcularCluster(total) {
   return "Bronze";
 }
 
+// Escapa texto vindo do banco antes de colocá-lo em HTML gerado (relatórios/PDF)
+const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
 const SEGMENTOS = ["Infantil", "Fundamental 1", "Fundamental 2", "Ensino Medio", "Outros"];
 
 function removerAcentos(str) {
@@ -74,12 +77,12 @@ function gerarPDF(escola, detalhes, hist) {
     ? detalhes.series.map(s => {
         const turmas = detalhes.turmas.filter(t => t.grade_class_id === s.id);
         return `
-          <tr><td colspan="3" style="background:#f5f5f5;font-weight:700;padding:8px 14px;font-size:12px;">${s.serie}</td></tr>
+          <tr><td colspan="3" style="background:#f5f5f5;font-weight:700;padding:8px 14px;font-size:12px;">${esc(s.serie)}</td></tr>
           ${turmas.map(t => `
             <tr>
-              <td style="padding:7px 14px 7px 28px;">Turma ${t.turma}</td>
+              <td style="padding:7px 14px 7px 28px;">Turma ${esc(t.turma)}</td>
               <td style="padding:7px 14px;">${t.num_alunos} alunos</td>
-              <td style="padding:7px 14px;">${t.professor_maker || "—"}</td>
+              <td style="padding:7px 14px;">${esc(t.professor_maker || "—")}</td>
             </tr>
           `).join("")}
         `;
@@ -99,7 +102,7 @@ function gerarPDF(escola, detalhes, hist) {
   win.document.write(`
     <!DOCTYPE html><html><head>
     <meta charset="UTF-8">
-    <title>Alunado — ${escola.nome}</title>
+    <title>Alunado — ${esc(escola.nome)}</title>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body { font-family: Arial, sans-serif; font-size: 13px; color: #111; background: #fff; padding: 24px; max-width: 800px; margin: 0 auto; }
@@ -132,12 +135,12 @@ function gerarPDF(escola, detalhes, hist) {
       <div class="sec-title">1. Dados da Escola</div>
       <div class="sec-body">
         <div class="grid">
-          <div><div class="f-label">Nome</div><div class="f-val">${escola.nome}</div></div>
-          <div><div class="f-label">Responsável</div><div class="f-val">${escola.responsavel_escola || "—"}</div></div>
-          <div><div class="f-label">Telefone</div><div class="f-val">${escola.telefone || "—"}</div></div>
-          <div><div class="f-label">CEP</div><div class="f-val">${escola.cep || "—"}</div></div>
+          <div><div class="f-label">Nome</div><div class="f-val">${esc(escola.nome)}</div></div>
+          <div><div class="f-label">Responsável</div><div class="f-val">${esc(escola.responsavel_escola || "—")}</div></div>
+          <div><div class="f-label">Telefone</div><div class="f-val">${esc(escola.telefone || "—")}</div></div>
+          <div><div class="f-label">CEP</div><div class="f-val">${esc(escola.cep || "—")}</div></div>
           <div style="grid-column:1/-1"><div class="f-label">Endereço</div><div class="f-val">${enderecoCompleto}</div></div>
-          <div><div class="f-label">Tipo de Frete</div><div class="f-val">${escola.tipo_frete || "—"}</div></div>
+          <div><div class="f-label">Tipo de Frete</div><div class="f-val">${esc(escola.tipo_frete || "—")}</div></div>
           <div><div class="f-label">Início das Aulas</div><div class="f-val">${fmtDate(escola.data_inicio)}</div></div>
           <div><div class="f-label">Recebimento do Material</div><div class="f-val">${fmtDate(escola.data_recebimento)}</div></div>
         </div>
@@ -147,8 +150,8 @@ function gerarPDF(escola, detalhes, hist) {
       <div class="sec-title">2. Programa e Idioma</div>
       <div class="sec-body">
         <div class="grid">
-          <div><div class="f-label">Programa</div><div class="f-val">${escola.programa || "—"}</div></div>
-          <div><div class="f-label">Idioma do Material</div><div class="f-val">${escola.idioma_material || "—"}</div></div>
+          <div><div class="f-label">Programa</div><div class="f-val">${esc(escola.programa || "—")}</div></div>
+          <div><div class="f-label">Idioma do Material</div><div class="f-val">${esc(escola.idioma_material || "—")}</div></div>
         </div>
       </div>
     </div>
@@ -169,8 +172,8 @@ function gerarPDF(escola, detalhes, hist) {
     <div class="section">
       <div class="sec-title">4. Responsável pelo Preenchimento</div>
       <div class="sec-body">
-        <div><div class="f-label">Nome</div><div class="f-val">${hist.responsavel_preenchimento || "—"}</div></div>
-        ${hist.assinatura_url ? `<div style="margin-top:12px;"><div class="f-label">Assinatura</div><img class="sig-img" src="${hist.assinatura_url}" /></div>` : ""}
+        <div><div class="f-label">Nome</div><div class="f-val">${esc(hist.responsavel_preenchimento || "—")}</div></div>
+        ${hist.assinatura_url ? `<div style="margin-top:12px;"><div class="f-label">Assinatura</div><img class="sig-img" src="${esc(hist.assinatura_url)}" /></div>` : ""}
       </div>
     </div>
     ` : ""}
@@ -179,8 +182,8 @@ function gerarPDF(escola, detalhes, hist) {
       <div class="sec-title">5. Calendário Escolar</div>
       <div class="sec-body">
         <div class="f-label">Arquivo Anexado</div>
-        <div class="f-val" style="margin-top:4px;">${hist.calendario_nome || "Calendário"}</div>
-        <a href="${hist.calendario_url}" target="_blank" style="display:inline-block;margin-top:8px;color:#0066cc;font-size:12px;">Abrir arquivo</a>
+        <div class="f-val" style="margin-top:4px;">${esc(hist.calendario_nome || "Calendário")}</div>
+        <a href="${esc(hist.calendario_url)}" target="_blank" style="display:inline-block;margin-top:8px;color:#0066cc;font-size:12px;">Abrir arquivo</a>
       </div>
     </div>
     ` : ""}
@@ -200,10 +203,10 @@ function gerarPDFCiclo(ciclo) {
   }));
   const escolasHtml = snapshot.map((e, i) => `
     <tr style="background:${i % 2 === 0 ? "#fff" : "#f9f9f9"}">
-      <td style="padding:8px 14px;font-weight:600;">${e.nome}</td>
-      <td style="padding:8px 14px;">${e.programa || "—"}</td>
+      <td style="padding:8px 14px;font-weight:600;">${esc(e.nome)}</td>
+      <td style="padding:8px 14px;">${esc(e.programa || "—")}</td>
       <td style="padding:8px 14px;">${CLUSTER_PT[e.cluster] || e.cluster || "—"}</td>
-      <td style="padding:8px 14px;">${e.tipo_frete || "—"}</td>
+      <td style="padding:8px 14px;">${esc(e.tipo_frete || "—")}</td>
       <td style="padding:8px 14px;font-weight:700;text-align:right;">${(e.total_alunos || 0).toLocaleString("pt-BR")}</td>
     </tr>
   `).join("");
@@ -212,7 +215,7 @@ function gerarPDFCiclo(ciclo) {
   win.document.write(`
     <!DOCTYPE html><html><head>
     <meta charset="UTF-8">
-    <title>Relatório —${ciclo.nome}</title>
+    <title>Relatório —${esc(ciclo.nome)}</title>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body { font-family: Arial, sans-serif; font-size: 13px; color: #111; background: #fff; padding: 24px; max-width: 900px; margin: 0 auto; }
@@ -241,7 +244,7 @@ function gerarPDFCiclo(ciclo) {
     <div class="header">
       <div>
         <div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Mundo Maker — Relatório de Ciclo</div>
-        <h1>${ciclo.nome}</h1>
+        <h1>${esc(ciclo.nome)}</h1>
         <div class="sub">${fmtDate(ciclo.data_inicio)} até ${fmtDate(ciclo.data_encerramento)}</div>
       </div>
       <div style="text-align:right;">
@@ -985,10 +988,10 @@ function InspiramakerDashboard({ onVoltar }) {
         const comp = calcularComplementar(proj, s, escola.numSalas);
         rows += `
           <tr style="background:${si % 2 === 0 ? "#fff" : "#f9f9f9"}">
-            <td style="padding:5px 10px;border:1px solid #ddd;">${si === 0 ? escola.idioma : ""}</td>
-            <td style="padding:5px 10px;border:1px solid #ddd;font-weight:${si === 0 ? "700" : "400"}">${si === 0 ? escola.nome : ""}</td>
-            <td style="padding:5px 10px;border:1px solid #ddd;">${proj}</td>
-            <td style="text-align:center;padding:5px 10px;border:1px solid #ddd;">${s.serie}</td>
+            <td style="padding:5px 10px;border:1px solid #ddd;">${si === 0 ? esc(escola.idioma) : ""}</td>
+            <td style="padding:5px 10px;border:1px solid #ddd;font-weight:${si === 0 ? "700" : "400"}">${si === 0 ? esc(escola.nome) : ""}</td>
+            <td style="padding:5px 10px;border:1px solid #ddd;">${esc(proj)}</td>
+            <td style="text-align:center;padding:5px 10px;border:1px solid #ddd;">${esc(s.serie)}</td>
             ${cols}
             <td style="text-align:center;font-weight:700;padding:5px 10px;border:1px solid #ddd;">${tot}</td>
             <td style="text-align:center;font-weight:800;padding:5px 10px;border:1px solid #ddd;background:#e8f5e9;">${base}</td>
@@ -1695,14 +1698,8 @@ export default function Dashboard() {
   const [senha, setSenha]               = useState("");
   const [erroLogin, setErroLogin]       = useState("");
   const [manterLogado, setManterLogado] = useState(false);
-  // Fluxo esqueci a senha
-  const [senhaStep, setSenhaStep]       = useState("login"); // "login"|"email"|"link"|"newpass"
-  const [senhaEmail, setSenhaEmail]     = useState("");
-  const [senhaToken, setSenhaToken]     = useState("");
-  const [senhaMsg, setSenhaMsg]         = useState("");
-  const [novaSenha1, setNovaSenha1]     = useState("");
-  const [novaSenha2, setNovaSenha2]     = useState("");
-  const [senhaOk, setSenhaOk]           = useState(false);
+  // "Esqueci minha senha": só mostra orientação (a redefinição é feita por um administrador)
+  const [senhaStep, setSenhaStep]       = useState("login"); // "login"|"ajuda"
   const [escolas, setEscolas]           = useState([]);
   const [todosEnvios, setTodosEnvios]   = useState([]);
   const [loading, setLoading]           = useState(false);
@@ -1752,67 +1749,6 @@ export default function Dashboard() {
       }
     } catch {
       setErroLogin("E-mail ou senha incorretos.");
-    }
-  }
-
-  async function handleGerarReset(e) {
-    e.preventDefault();
-    setSenhaMsg("");
-    if (!senhaEmail.trim()) return;
-    try {
-      // Verifica se email existe
-      const { data: usuario } = await supabase
-        .from("usuarios").select("id,email")
-        .eq("email", senhaEmail.trim().toLowerCase())
-        .eq("ativo", true)
-        .single();
-      if (!usuario) {
-        setSenhaMsg("E-mail não encontrado.");
-        return;
-      }
-      // Gera token UUID e salva no DB com validade de 1h
-      const token   = crypto.randomUUID();
-      const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      await supabase.from("usuarios").update({ reset_token: token, reset_expires: expires }).eq("id", usuario.id);
-      setSenhaToken(token);
-      setSenhaStep("link");
-    } catch {
-      setSenhaMsg("Erro ao gerar link. Tente novamente.");
-    }
-  }
-
-  async function handleNovaSenha(e) {
-    e.preventDefault();
-    setSenhaMsg("");
-    if (!novaSenha1 || novaSenha1 !== novaSenha2) {
-      setSenhaMsg("As senhas não coincidem.");
-      return;
-    }
-    if (novaSenha1.length < 6) {
-      setSenhaMsg("Senha deve ter ao menos 6 caracteres.");
-      return;
-    }
-    try {
-      // Valida token no DB
-      const { data: usuario } = await supabase
-        .from("usuarios").select("id,reset_expires")
-        .eq("reset_token", senhaToken)
-        .eq("ativo", true)
-        .single();
-      if (!usuario) { setSenhaMsg("Link inválido ou expirado."); return; }
-      if (new Date(usuario.reset_expires) < new Date()) { setSenhaMsg("Link expirado. Gere um novo."); return; }
-      // Hash e salva nova senha
-      const enc  = new TextEncoder();
-      const buf  = await crypto.subtle.digest("SHA-256", enc.encode(novaSenha1));
-      const hash = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-      await supabase.from("usuarios").update({ senha: hash, reset_token: null, reset_expires: null }).eq("id", usuario.id);
-      setSenhaOk(true);
-      setTimeout(() => {
-        setSenhaStep("login"); setSenhaToken(""); setSenhaEmail("");
-        setNovaSenha1(""); setNovaSenha2(""); setSenhaOk(false); setSenhaMsg("");
-      }, 3000);
-    } catch {
-      setSenhaMsg("Erro ao salvar senha. Tente novamente.");
     }
   }
 
@@ -2043,7 +1979,7 @@ export default function Dashboard() {
               ENTRAR
             </button>
             <div style={{ textAlign: "center", marginTop: 16 }}>
-              <button type="button" onClick={() => { setSenhaStep("email"); setSenhaEmail(""); setSenhaMsg(""); }}
+              <button type="button" onClick={() => setSenhaStep("ajuda")}
                 style={{ background: "none", border: "none", color: "#888", fontSize: 13, cursor: "pointer", textDecoration: "underline", fontFamily: font }}>
                 Esqueci minha senha
               </button>
@@ -2051,84 +1987,18 @@ export default function Dashboard() {
           </form>
         )}
 
-        {/* ── Step: digitar e-mail ── */}
-        {senhaStep === "email" && (
-          <form onSubmit={handleGerarReset}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#111", marginBottom: 8 }}>Redefinir senha</div>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 18 }}>
-              Digite seu e-mail cadastrado para gerar o link de redefinição.
-            </div>
-            {senhaMsg && (
-              <div style={{ background: "#fff0f0", border: "1.5px solid #FF3B41", color: "#cc0000", borderRadius: 4, padding: "10px 14px", fontSize: 13, marginBottom: 14 }}>
-                {senhaMsg}
-              </div>
-            )}
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 6 }}>E-mail</label>
-              <input type="email" value={senhaEmail} onChange={e => setSenhaEmail(e.target.value)}
-                placeholder="seu@email.com" style={inpLogin} autoFocus />
-            </div>
-            <button type="submit" style={{ width: "100%", padding: "13px", background: "#39DF18", color: "#000", border: "none", borderRadius: 4, fontSize: 14, fontWeight: 800, fontFamily: font, cursor: "pointer" }}>
-              Gerar link de redefinição
-            </button>
-            <div style={{ textAlign: "center", marginTop: 14 }}>
-              <button type="button" onClick={() => setSenhaStep("login")}
-                style={{ background: "none", border: "none", color: "#888", fontSize: 13, cursor: "pointer", textDecoration: "underline", fontFamily: font }}>
-                ← Voltar ao login
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* ── Step: link gerado ── */}
-        {senhaStep === "link" && (
+        {/* ── Esqueci minha senha: orientação ── */}
+        {senhaStep === "ajuda" && (
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#111", marginBottom: 8 }}>Link gerado!</div>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 18 }}>
-              Clique no botão abaixo para criar uma nova senha. O link expira em 1 hora.
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#111", marginBottom: 8 }}>Esqueceu a senha?</div>
+            <div style={{ fontSize: 13, color: "#666", marginBottom: 18, lineHeight: 1.5 }}>
+              Por segurança, a senha é redefinida por um administrador. Fale com a coordenação do sistema e peça uma nova senha. Depois do primeiro acesso, ela pode ser trocada.
             </div>
-            <button onClick={() => setSenhaStep("newpass")}
-              style={{ width: "100%", padding: "13px", background: "#39DF18", color: "#000", border: "none", borderRadius: 4, fontSize: 14, fontWeight: 800, fontFamily: font, cursor: "pointer", marginBottom: 12 }}>
-              🔑 Criar nova senha
+            <button type="button" onClick={() => setSenhaStep("login")}
+              style={{ width: "100%", padding: "13px", background: "#39DF18", color: "#000", border: "none", borderRadius: 4, fontSize: 14, fontWeight: 800, fontFamily: font, cursor: "pointer" }}>
+              ← Voltar ao login
             </button>
-            <div style={{ textAlign: "center" }}>
-              <button onClick={() => setSenhaStep("login")}
-                style={{ background: "none", border: "none", color: "#888", fontSize: 13, cursor: "pointer", textDecoration: "underline", fontFamily: font }}>
-                ← Voltar ao login
-              </button>
-            </div>
           </div>
-        )}
-
-        {/* ── Step: nova senha ── */}
-        {senhaStep === "newpass" && (
-          <form onSubmit={handleNovaSenha}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#111", marginBottom: 8 }}>Nova senha</div>
-            {senhaOk && (
-              <div style={{ background: "#f0fff4", border: "1.5px solid #39DF18", color: "#166534", borderRadius: 4, padding: "10px 14px", fontSize: 13, marginBottom: 14, textAlign: "center", fontWeight: 700 }}>
-                ✅ Senha alterada com sucesso! Redirecionando...
-              </div>
-            )}
-            {senhaMsg && !senhaOk && (
-              <div style={{ background: "#fff0f0", border: "1.5px solid #FF3B41", color: "#cc0000", borderRadius: 4, padding: "10px 14px", fontSize: 13, marginBottom: 14 }}>
-                {senhaMsg}
-              </div>
-            )}
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 6 }}>Nova senha</label>
-              <input type="password" value={novaSenha1} onChange={e => setNovaSenha1(e.target.value)}
-                placeholder="Mínimo 6 caracteres" style={inpLogin} autoFocus />
-            </div>
-            <div style={{ marginBottom: 18 }}>
-              <label style={{ fontSize: 11, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 6 }}>Confirmar senha</label>
-              <input type="password" value={novaSenha2} onChange={e => setNovaSenha2(e.target.value)}
-                placeholder="Repita a nova senha" style={inpLogin} />
-            </div>
-            <button type="submit" disabled={senhaOk}
-              style={{ width: "100%", padding: "13px", background: "#39DF18", color: "#000", border: "none", borderRadius: 4, fontSize: 14, fontWeight: 800, fontFamily: font, cursor: senhaOk ? "default" : "pointer", opacity: senhaOk ? 0.6 : 1 }}>
-              💾 Salvar nova senha
-            </button>
-          </form>
         )}
       </div>
     </div>

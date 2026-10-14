@@ -33,46 +33,48 @@ function mapTipo(tipo) {
   return tipo;
 }
 
+const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
 function gerarPDFFormulario(dadosGerais, series, totalAlunos, responsavel, calendarioNome) {
   const fmtDate = (val) => val ? new Date(val + "T12:00:00").toLocaleDateString("pt-BR") : "—";
   const seriesHtml = series.map(s => {
     const totalSerie = s.turmas.reduce((a, t) => a + (parseInt(t.num_alunos) || 0), 0);
     return `
       <tr style="background:#f5f5f5;">
-        <td colspan="3" style="padding:8px 14px;font-weight:700;font-size:12px;">${s.serie}${s.projeto ? ` — Projeto: ${s.projeto}` : ""} — ${totalSerie} alunos</td>
+        <td colspan="3" style="padding:8px 14px;font-weight:700;font-size:12px;">${esc(s.serie)}${s.projeto ? ` — Projeto: ${esc(s.projeto)}` : ""} — ${totalSerie} alunos</td>
       </tr>
       ${s.turmas.map(t => `
         <tr>
-          <td style="padding:7px 14px 7px 28px;">Turma ${t.turma}</td>
+          <td style="padding:7px 14px 7px 28px;">Turma ${esc(t.turma)}</td>
           <td style="padding:7px 14px;">${t.num_alunos || 0} alunos</td>
-          <td style="padding:7px 14px;">${t.professor_maker || "—"}</td>
+          <td style="padding:7px 14px;">${esc(t.professor_maker || "—")}</td>
         </tr>
       `).join("")}`;
   }).join("");
   const win = window.open("", "_blank");
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Formulário de Alunado — ${dadosGerais.nome}</title>
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Formulário de Alunado — ${esc(dadosGerais.nome)}</title>
     <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:24px;max-width:800px;margin:0 auto}.print-btn{background:#39DF18;border:none;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer;border-radius:4px;margin-bottom:20px}.header{background:#39DF18;padding:20px 24px;border-radius:4px;margin-bottom:20px}.header h1{font-size:18px;font-weight:800}.section{border:1px solid #ddd;border-radius:4px;overflow:hidden;margin-bottom:16px}.sec-title{background:#111;color:#fff;padding:9px 16px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px}.sec-body{padding:16px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.f-label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:2px}.f-val{font-weight:600;font-size:13px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:7px 14px;border:1px solid #e5e5e5;text-align:left}th{background:#f5f5f5;font-size:10px;font-weight:700;text-transform:uppercase}.total-box{margin-top:14px;background:#111;color:#39DF18;border-radius:4px;padding:14px 18px}.total-num{font-size:32px;font-weight:800;line-height:1}.total-label{font-size:10px;color:#aaa;text-transform:uppercase;margin-top:4px}@media print{.print-btn{display:none}body{padding:0}}</style>
     </head><body>
     <button class="print-btn" onclick="window.print()">🖨️ Imprimir / Salvar como PDF</button>
     <div class="header"><h1>Mundo Maker — Formulário de Alunado</h1><p>Gerado em: ${new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"})}</p></div>
     <div class="section"><div class="sec-title">1. Dados da Escola</div><div class="sec-body"><div class="grid">
-      <div><div class="f-label">Nome</div><div class="f-val">${dadosGerais.nome}</div></div>
-      <div><div class="f-label">Responsável</div><div class="f-val">${dadosGerais.responsavel||"—"}</div></div>
-      <div><div class="f-label">Telefone</div><div class="f-val">${dadosGerais.telefone||"—"}</div></div>
-      <div><div class="f-label">Tipo de Frete</div><div class="f-val">${dadosGerais.tipo_frete||"—"}</div></div>
+      <div><div class="f-label">Nome</div><div class="f-val">${esc(dadosGerais.nome)}</div></div>
+      <div><div class="f-label">Responsável</div><div class="f-val">${esc(dadosGerais.responsavel||"—")}</div></div>
+      <div><div class="f-label">Telefone</div><div class="f-val">${esc(dadosGerais.telefone||"—")}</div></div>
+      <div><div class="f-label">Tipo de Frete</div><div class="f-val">${esc(dadosGerais.tipo_frete||"—")}</div></div>
       <div><div class="f-label">Início das Aulas</div><div class="f-val">${fmtDate(dadosGerais.data_inicio)}</div></div>
       <div><div class="f-label">Recebimento do Material</div><div class="f-val">${fmtDate(dadosGerais.data_recebimento)}</div></div>
     </div></div></div>
     <div class="section"><div class="sec-title">2. Programa e Idioma</div><div class="sec-body"><div class="grid">
-      <div><div class="f-label">Programa</div><div class="f-val">${dadosGerais.programa||"—"}</div></div>
-      <div><div class="f-label">Idioma do Material</div><div class="f-val">${dadosGerais.idioma_material||"—"}</div></div>
+      <div><div class="f-label">Programa</div><div class="f-val">${esc(dadosGerais.programa||"—")}</div></div>
+      <div><div class="f-label">Idioma do Material</div><div class="f-val">${esc(dadosGerais.idioma_material||"—")}</div></div>
     </div></div></div>
     <div class="section"><div class="sec-title">3. Séries e Turmas</div><div class="sec-body">
       <table><thead><tr><th>Série / Turma</th><th>Alunos</th><th>Professor Maker</th></tr></thead><tbody>${seriesHtml}</tbody></table>
       <div class="total-box"><div class="total-num">${totalAlunos.toLocaleString("pt-BR")}</div><div class="total-label">Total de Alunos</div></div>
     </div></div>
-    <div class="section"><div class="sec-title">4. Responsável pelo Preenchimento</div><div class="sec-body"><div class="f-label">Nome</div><div class="f-val" style="margin-top:4px;">${responsavel||"—"}</div></div></div>
-    ${calendarioNome?`<div class="section"><div class="sec-title">5. Calendário Escolar</div><div class="sec-body"><div class="f-label">Arquivo Anexado</div><div class="f-val" style="margin-top:4px;">${calendarioNome}</div></div></div>`:""}
+    <div class="section"><div class="sec-title">4. Responsável pelo Preenchimento</div><div class="sec-body"><div class="f-label">Nome</div><div class="f-val" style="margin-top:4px;">${esc(responsavel||"—")}</div></div></div>
+    ${calendarioNome?`<div class="section"><div class="sec-title">5. Calendário Escolar</div><div class="sec-body"><div class="f-label">Arquivo Anexado</div><div class="f-val" style="margin-top:4px;">${esc(calendarioNome)}</div></div></div>`:""}
     </body></html>`);
   win.document.close();
 }

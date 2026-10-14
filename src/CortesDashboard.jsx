@@ -272,7 +272,7 @@ export default function CortesDashboard({ onVoltar }) {
       const row  = rows[proj] || {};
       const bg   = i % 2 === 0 ? "#fff" : "#f9f9f9";
       const geralProj = total(row, "base") + total(row, "comp") + total(row, "prof");
-      let tr = `<tr style="background:${bg};">${tdCell(proj, true, "left", bg)}`;
+      let tr = `<tr style="background:${bg};">${tdCell(String(proj ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"), true, "left", bg)}`;
       BLOCOS.forEach(b => {
         tr += tdCell(fmtN(row[`qtd_${b.key}`]));
         CAMPOS.forEach(c => {
