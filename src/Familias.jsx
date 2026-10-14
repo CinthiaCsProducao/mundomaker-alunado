@@ -247,8 +247,20 @@ function AbaChamada({ escola, alunos }) {
   const [mes, setMes] = useState(agora.getMonth());
   const [registros, setRegistros] = useState({});   // aluno_id -> linha
   const [carregando, setCarregando] = useState(true);
+  const [turmaSel, setTurmaSel] = useState("");   // "" = todas as turmas
 
   const ativos = useMemo(() => alunos.filter(a => a.status === "Ativo").sort(ordenaNome), [alunos]);
+  const turmas = useMemo(() => [...new Set(ativos.map(a => (a.turma || "").trim()).filter(Boolean))].sort((x, y) => x.localeCompare(y, "pt-BR")), [ativos]);
+  const temSemTurma = useMemo(() => ativos.some(a => !(a.turma || "").trim()), [ativos]);
+  // Se a turma escolhida não existe nesta escola (ex.: troca de escola), volta para "todas"
+  useEffect(() => {
+    if (turmaSel && turmaSel !== "__sem__" && !turmas.includes(turmaSel)) setTurmaSel("");
+  }, [turmas, turmaSel]);
+  const visiveis = useMemo(() => {
+    if (!turmaSel) return ativos;
+    if (turmaSel === "__sem__") return ativos.filter(a => !(a.turma || "").trim());
+    return ativos.filter(a => (a.turma || "").trim() === turmaSel);
+  }, [ativos, turmaSel]);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -281,7 +293,7 @@ function AbaChamada({ escola, alunos }) {
 
   function exportar() {
     const linhas = [["Aluno", "Responsável", "Turma", "1ª sem", "2ª sem", "3ª sem", "4ª sem", "5ª sem", "Frequência %", "Observações"]];
-    ativos.forEach(a => { const r = registros[a.id] || {}; const f = freq(r); linhas.push([a.aluno, a.responsavel, a.turma, r.s1, r.s2, r.s3, r.s4, r.s5, f === null ? "" : f, r.obs]); });
+    visiveis.forEach(a => { const r = registros[a.id] || {}; const f = freq(r); linhas.push([a.aluno, a.responsavel, a.turma, r.s1, r.s2, r.s3, r.s4, r.s5, f === null ? "" : f, r.obs]); });
     baixarCSV(`Chamada_${escola.nome.replace(/[^\w]+/g, "_")}_${MESES[mes]}_${ano}.csv`, linhas);
   }
 
@@ -296,6 +308,11 @@ function AbaChamada({ escola, alunos }) {
         </select>
         <select value={ano} onChange={e => setAno(+e.target.value)} style={{ ...inp, width: "auto", fontWeight: 800 }}>
           {anos.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <select value={turmaSel} onChange={e => setTurmaSel(e.target.value)} style={{ ...inp, width: "auto", fontWeight: 800 }}>
+          <option value="">Todas as turmas ({ativos.length})</option>
+          {turmas.map(tn => <option key={tn} value={tn}>{tn} ({ativos.filter(a => (a.turma || "").trim() === tn).length})</option>)}
+          {temSemTurma && <option value="__sem__">Sem turma</option>}
         </select>
         <div style={{ fontSize: 12, color: "#6D6E71", fontFamily: fontB }}>
           Toque na semana para alternar: <b style={{ color: COR.P.c }}>P</b> presente · <b style={{ color: COR.F.c }}>F</b> falta · <b style={{ color: COR.J.c }}>J</b> justificada
@@ -319,7 +336,7 @@ function AbaChamada({ escola, alunos }) {
               </tr>
             </thead>
             <tbody>
-              {ativos.map(a => {
+              {visiveis.map(a => {
                 const r = registros[a.id] || {};
                 const f = freq(r);
                 return (
