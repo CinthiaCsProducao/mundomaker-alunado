@@ -16,6 +16,7 @@ const PERMISSOES_LABELS = [
   { key: "inspiramaker", label: "Inspiramaker" },
   { key: "projecao",     label: "Projeção de Material" },
   { key: "baseEscolas",  label: "Base de Escolas" },
+  { key: "familias",     label: "Famílias (alunos, responsáveis e valores)" },
   { key: "admin",        label: "Admin (gerenciar usuários + encerrar ciclo)" },
 ];
 
@@ -25,7 +26,7 @@ async function hashSenha(senha) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
 }
 
-const PERM_VAZIO = { historico:false, escolas:false, inspiramaker:false, projecao:false, baseEscolas:false, admin:false, popsAreas:[] };
+const PERM_VAZIO = { historico:false, escolas:false, inspiramaker:false, projecao:false, baseEscolas:false, familias:false, admin:false, popsAreas:[] };
 
 // Áreas dos POPs. Valor "*" = todas. Usuário antigo (sem o campo) = todas.
 const AREAS_POPS = ["CS", "Pedagógico", "Financeiro", "Produção", "Diretoria", "Comercial", "Núcleo Técnico"];
