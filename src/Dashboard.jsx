@@ -1763,7 +1763,7 @@ export default function Dashboard() {
     if (!em) { setErroLogin("Digite seu e-mail."); return; }
     const { error } = await supabase.auth.signInWithOtp({
       email: em,
-      options: { shouldCreateUser: true, emailRedirectTo: window.location.origin },
+      options: { shouldCreateUser: true, emailRedirectTo: window.location.origin + "/dashboard" },
     });
     if (error && /rate|second|minute/i.test(error.message)) {
       setErroLogin("Muitas tentativas. Aguarde alguns minutos e tente de novo.");
