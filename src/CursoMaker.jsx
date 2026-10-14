@@ -103,14 +103,18 @@ function ModalPagamentos({ aluno, registros, onClose, onMudou }) {
 }
 
 // ── Modal: cadastro do aluno ────────────────────────────────────
-function ModalAluno({ aluno, horarios, onSave, onClose }) {
+function ModalAluno({ aluno, horarios, turmas, professores, onSave, onClose }) {
   const [f, setF] = useState({
     nome: "", tipo: "RENOVAÇÃO", matricula: "", nascimento: "", escola_estuda: "", responsavel: "", cpf: "", telefone: "", email: "",
     plano: "SEMESTRAL", endereco: "", dia: "", horario: "", valor: "", faltando: "", forma_pagamento: "", status_pgto: "", contrato: "",
     conta_azul: "", observacoes: "", status: "Ativo", ...Object.fromEntries(Object.entries(aluno).map(([k, v]) => [k, v ?? ""])),
   });
   const [salvando, setSalvando] = useState(false);
+  const [profEscolhido, setProfEscolhido] = useState(null);   // null = não mexeu no professor
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
+  // O professor é da turma (dia + horário): mostra o professor atual dessa turma
+  const turmaAtual = turmas.find(tu => tu.dia === normDia(f.dia) && (tu.horario || "") === normHor(f.horario));
+  const profValor = profEscolhido !== null ? profEscolhido : (turmaAtual?.professor_email || "").toLowerCase();
   const campo = (k, label, extra = {}) => (
     <label style={{ ...lbl, gridColumn: extra.full ? "1 / -1" : undefined }}>{label}
       {extra.options ? (
@@ -135,7 +139,7 @@ function ModalAluno({ aluno, horarios, onSave, onClose }) {
       email: f.email || null, plano: f.plano || null, endereco: f.endereco || null, dia: normDia(f.dia), horario: normHor(f.horario) || null,
       valor: numOuNull(f.valor), faltando: numOuNull(f.faltando), forma_pagamento: f.forma_pagamento || null, status_pgto: f.status_pgto || null,
       contrato: f.contrato || null, conta_azul: f.conta_azul || null, observacoes: f.observacoes || null, status: f.status || "Ativo",
-    });
+    }, profEscolhido);
     setSalvando(false);
   }
 
@@ -160,6 +164,16 @@ function ModalAluno({ aluno, horarios, onSave, onClose }) {
           {campo("forma_pagamento", "Forma de pagamento")}
           {campo("dia", "Dia do curso", { options: DIAS, vazio: true })}
           {campo("horario", "Horário", { list: "cm-horarios" })}
+          <label style={{ ...lbl, gridColumn: "1 / -1" }}>Professor da turma
+            <select value={profValor} onChange={e => setProfEscolhido(e.target.value)} disabled={!f.dia} style={{ ...inp, opacity: f.dia ? 1 : .6 }}>
+              <option value="">— sem professor —</option>
+              {professores.map(pr => <option key={pr.email} value={pr.email.toLowerCase()}>{pr.nome}</option>)}
+              {profValor && !professores.some(pr => pr.email.toLowerCase() === profValor) && <option value={profValor}>{turmaAtual?.professor_nome || profValor}</option>}
+            </select>
+            <span style={{ fontSize: 11, fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "#6D6E71" }}>
+              {f.dia ? "O professor vale para toda a turma deste dia e horário." : "Escolha o dia do curso para definir o professor."}
+            </span>
+          </label>
           {campo("valor", "Valor (R$)")}
           {campo("faltando", "Faltando pagar (R$)")}
           {campo("status_pgto", "Status do pagamento")}
@@ -177,7 +191,7 @@ function ModalAluno({ aluno, horarios, onSave, onClose }) {
 }
 
 // ── Aba: Alunos ─────────────────────────────────────────────────
-function AbaAlunos({ alunos, turmas, pagamentos, recarregar, podeExcluir }) {
+function AbaAlunos({ alunos, turmas, professores, pagamentos, recarregar, podeExcluir }) {
   const [filtro, setFiltro] = useState("Ativo");
   const [diaSel, setDiaSel] = useState("");
   const [busca, setBusca] = useState("");
@@ -211,12 +225,23 @@ function AbaAlunos({ alunos, turmas, pagamentos, recarregar, podeExcluir }) {
     };
   }, [alunos, pagamentos]);
 
-  async function salvar(dados) {
+  async function salvar(dados, prof) {
     let erro;
     if (modal?.id) ({ error: erro } = await supabase.from("cm_alunos").update(dados).eq("id", modal.id));
     else ({ error: erro } = await supabase.from("cm_alunos").insert(dados));
     if (erro) { alert("Erro ao salvar: " + erro.message); return; }
-    if (dados.dia) await supabase.from("cm_turmas").upsert({ dia: dados.dia, horario: dados.horario || "" }, { onConflict: "dia,horario", ignoreDuplicates: true });
+    if (dados.dia) {
+      if (prof !== null && prof !== undefined) {
+        // professor escolhido no cadastro: grava na turma (dia + horário)
+        const p = professores.find(x => x.email.toLowerCase() === prof);
+        const nomeAntigo = turmas.find(tu => (tu.professor_email || "").toLowerCase() === prof)?.professor_nome || null;
+        await supabase.from("cm_turmas").upsert(
+          { dia: dados.dia, horario: dados.horario || "", professor_email: prof || null, professor_nome: prof ? (p ? p.nome : nomeAntigo) : null },
+          { onConflict: "dia,horario" });
+      } else {
+        await supabase.from("cm_turmas").upsert({ dia: dados.dia, horario: dados.horario || "" }, { onConflict: "dia,horario", ignoreDuplicates: true });
+      }
+    }
     setModal(null);
     recarregar();
   }
@@ -306,7 +331,7 @@ function AbaAlunos({ alunos, turmas, pagamentos, recarregar, podeExcluir }) {
           </table>
         </div>
       )}
-      {modal && <ModalAluno aluno={modal} horarios={horarios} onSave={salvar} onClose={() => setModal(null)} />}
+      {modal && <ModalAluno aluno={modal} horarios={horarios} turmas={turmas} professores={professores} onSave={salvar} onClose={() => setModal(null)} />}
       {modalPgto && <ModalPagamentos aluno={modalPgto} registros={pagamentos[modalPgto.id] || []} onClose={() => setModalPgto(null)} onMudou={recarregar} />}
     </div>
   );
@@ -496,6 +521,100 @@ function AbaTurmas({ alunos, turmas, professores, recarregar }) {
   );
 }
 
+// ── Aba: Aniversários (lê a data de nascimento do cadastro) ─────
+// Aceita "dd/mm/aaaa", "dd/mm/aa", "dd/mm" e "aaaa-mm-dd"
+function lerNascimento(txt) {
+  const s = String(txt || "").trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  let dia, mes, ano;
+  if (m) { ano = +m[1]; mes = +m[2]; dia = +m[3]; }
+  else {
+    m = s.match(/^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?/);
+    if (!m) return null;
+    dia = +m[1]; mes = +m[2]; ano = m[3] && m[3].length === 4 ? +m[3] : null;
+  }
+  if (!(dia >= 1 && dia <= 31 && mes >= 1 && mes <= 12)) return null;
+  const anoAtual = new Date().getFullYear();
+  if (ano !== null && (ano < 1990 || ano > anoAtual)) ano = null;
+  return { dia, mes: mes - 1, ano };
+}
+
+function AbaAniversarios({ alunos, turmas }) {
+  const agora = new Date();
+  const mesAtual = agora.getMonth();
+  const [mes, setMes] = useState(mesAtual);
+  const [incluirCancelados, setIncluirCancelados] = useState(false);
+
+  const base = alunos.filter(a => incluirCancelados || a.status === "Ativo");
+  const comData = base.map(a => ({ a, v: lerNascimento(a.nascimento) })).filter(x => x.v);
+  const semData = base.length - comData.length;
+  const doMes = comData.filter(x => x.v.mes === mes).sort((x, y) => x.v.dia - y.v.dia || ordenaNome(x.a, y.a));
+  const hoje = doMes.filter(x => mes === mesAtual && x.v.dia === agora.getDate()).length;
+  const proximos7 = doMes.filter(x => mes === mesAtual && x.v.dia > agora.getDate() && x.v.dia <= agora.getDate() + 7).length;
+  const profDe = (a) => turmas.find(tu => tu.dia === a.dia && (tu.horario || "") === (a.horario || ""))?.professor_nome || "";
+  const idadeQueFaz = (v) => v.ano ? agora.getFullYear() - v.ano : null;
+
+  function exportar() {
+    const linhas = [["Dia", "Aluno", "Idade que faz", "Responsável", "Telefone", "Dia do curso", "Horário", "Professor"]];
+    doMes.forEach(({ a, v }) => linhas.push([`${String(v.dia).padStart(2, "0")}/${String(v.mes + 1).padStart(2, "0")}`, a.nome, idadeQueFaz(v) ?? "", a.responsavel, a.telefone, a.dia ? cap(a.dia) : "", a.horario, profDe(a)]));
+    baixarCSV(`Aniversariantes_CursoMaker_${MESES[mes]}.csv`, linhas);
+  }
+
+  const card = (valor, rotulo, cor) => (
+    <div style={{ background: "#F1F2F2", borderRadius: 6, padding: "14px 18px", borderTop: `4px solid ${cor}` }}>
+      <div style={{ fontSize: 28, fontWeight: 800, fontFamily: font, lineHeight: 1 }}>{valor}</div>
+      <div style={{ fontSize: 11, fontWeight: 700, fontFamily: font, letterSpacing: ".05em", textTransform: "uppercase", color: "#6D6E71", marginTop: 4 }}>{rotulo}</div>
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, fontFamily: font }}>Aniversariantes de</h2>
+        <select value={mes} onChange={e => setMes(+e.target.value)} style={{ ...inp, width: "auto", fontSize: 16, fontWeight: 800 }}>
+          {MESES.map((m, i) => <option key={m} value={i}>{m}{i === mesAtual ? " (mês atual)" : ""}</option>)}
+        </select>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontFamily: fontB, cursor: "pointer" }}>
+          <input type="checkbox" checked={incluirCancelados} onChange={e => setIncluirCancelados(e.target.checked)} />
+          Incluir alunos cancelados
+        </label>
+        <button onClick={exportar} disabled={!doMes.length} style={{ ...btnPrim, marginLeft: "auto", opacity: doMes.length ? 1 : .5, cursor: doMes.length ? "pointer" : "not-allowed" }}>↓ Exportar CSV</button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12, marginBottom: 18 }}>
+        {card(doMes.length, `Aniversariantes em ${MESES[mes]}`, PRETO)}
+        {mes === mesAtual && card(hoje, "Aniversariam hoje", VERDE)}
+        {mes === mesAtual && card(proximos7, "Nos próximos 7 dias", "#FFD902")}
+        {card(semData, "Alunos sem data de nascimento", "#DCDDDE")}
+      </div>
+
+      {doMes.length === 0 ? (
+        <div style={{ background: "#F1F2F2", borderRadius: 6, padding: 36, textAlign: "center", color: "#888", fontFamily: fontB }}>Nenhum aluno faz aniversário em {MESES[mes]}.</div>
+      ) : (
+        <div style={{ border: "1px solid #DCDDDE", borderRadius: 6, overflow: "hidden" }}>
+          <div style={{ background: PRETO, color: "#fff", padding: "10px 18px", fontFamily: font, fontWeight: 800, fontSize: 13, letterSpacing: ".05em", textTransform: "uppercase" }}>{MESES[mes]}</div>
+          {doMes.map(({ a, v }) => {
+            const ehHoje = mes === mesAtual && v.dia === agora.getDate();
+            const idade = idadeQueFaz(v);
+            return (
+              <div key={a.id} style={{ display: "grid", gridTemplateColumns: "60px 1fr auto", gap: 14, alignItems: "center", padding: "12px 18px", borderTop: "1px solid #DCDDDE", background: ehHoje ? "rgba(57,223,24,.1)" : "transparent" }}>
+                <b style={{ fontFamily: font, fontSize: 18 }}>{String(v.dia).padStart(2, "0")}</b>
+                <span>
+                  <b style={{ display: "block", fontSize: 14, fontFamily: font }}>{a.nome}{idade ? ` · faz ${idade} anos` : ""}</b>
+                  <small style={{ color: "#6D6E71", fontSize: 12 }}>
+                    {[a.responsavel && `Resp.: ${a.responsavel}`, a.telefone, a.dia && `${cap(a.dia)}${a.horario ? " " + a.horario : ""}`, profDe(a) && `Prof. ${profDe(a)}`].filter(Boolean).join(" · ") || "—"}
+                  </small>
+                </span>
+                {ehHoje && <span style={{ fontSize: 11, fontWeight: 800, fontFamily: font, padding: "3px 10px", borderRadius: 999, background: "rgba(57,223,24,.25)", color: "#148A00" }}>HOJE 🎂</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Página ──────────────────────────────────────────────────────
 // modoProfessor: só a lista de chamada das turmas do professor (sem dados pessoais nem financeiros)
 export default function CursoMaker({ onVoltar, modoProfessor = false, onSair, nomeUsuario = "", podeExcluir = false }) {
@@ -535,7 +654,7 @@ export default function CursoMaker({ onVoltar, modoProfessor = false, onSair, no
   useEffect(() => { carregar(); }, [carregar]);
 
   const totalAtivos = alunos.filter(a => a.status === "Ativo").length;
-  const abas = [["alunos", "Alunos"], ["chamada", "Lista de chamada"], ["turmas", "Turmas e professores"]];
+  const abas = [["alunos", "Alunos"], ["chamada", "Lista de chamada"], ["turmas", "Turmas e professores"], ["aniversarios", "Aniversários"]];
 
   return (
     <div style={{ minHeight: "100vh", background: "#F1F2F2", fontFamily: fontB }}>
@@ -574,8 +693,9 @@ export default function CursoMaker({ onVoltar, modoProfessor = false, onSair, no
           <div style={{ padding: 24 }}>
             {carregando ? <div style={{ padding: 24, textAlign: "center", color: "#aaa" }}>Carregando...</div> : (
               <>
-                {aba === "alunos" && !modoProfessor && <AbaAlunos alunos={alunos} turmas={turmas} pagamentos={pagamentos} recarregar={carregar} podeExcluir={podeExcluir} />}
+                {aba === "alunos" && !modoProfessor && <AbaAlunos alunos={alunos} turmas={turmas} professores={professores} pagamentos={pagamentos} recarregar={carregar} podeExcluir={podeExcluir} />}
                 {aba === "chamada" && <AbaChamada alunos={alunos} turmas={turmas} modoProfessor={modoProfessor} />}
+                {aba === "aniversarios" && !modoProfessor && <AbaAniversarios alunos={alunos} turmas={turmas} />}
                 {aba === "turmas" && !modoProfessor && <AbaTurmas alunos={alunos} turmas={turmas} professores={professores} recarregar={carregar} />}
               </>
             )}
