@@ -54,22 +54,39 @@ const btnSec  = { background: "#fff", color: PRETO, border: "2px solid #DCDDDE",
 const MES_ABREV = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 // Aluno com pagamento mensal: plano "Mensal" ou observação "Plano mensal"
 const ehMensal = (a) => a.plano === "Mensal" || /plano mensal/i.test(a.observacoes || "");
+// Forma de pagamento do aluno: "mensal" | "semestral" | "anual" | null
+// (mensal usa os meses 1 a 12; semestral usa mes 1 = 1º semestre e mes 7 = 2º semestre; anual usa mes 1)
+const tipoPgto = (a) => ehMensal(a) ? "mensal" : a.plano === "Semestral" ? "semestral" : a.plano === "Anual" ? "anual" : null;
+const mesValido = (tipo, mes) => tipo === "mensal" ? true : tipo === "semestral" ? (mes === 1 || mes === 7) : tipo === "anual" ? mes === 1 : false;
+const rotuloPeriodo = (tipo, r) => {
+  const aa = String(r.ano).slice(2);
+  if (tipo === "semestral") return `${r.mes === 7 ? "2º" : "1º"} sem/${aa}`;
+  if (tipo === "anual") return `Anual/${aa}`;
+  return `${MES_ABREV[r.mes - 1]}/${aa}`;
+};
 
 // ── Modal: controle das mensalidades do aluno ───────────────────
-function ModalMensalidades({ aluno, registros, onClose, onMudou }) {
+function ModalMensalidades({ aluno, tipo, registros, onClose, onMudou }) {
   const [ano, setAno] = useState(new Date().getFullYear());
   const [salvando, setSalvando] = useState(null);
   const anoAtual = new Date().getFullYear();
-  const statusDe = (m) => (registros.find(x => x.ano === ano && x.mes === m + 1) || {}).status || "";
 
-  async function definir(m, novo) {
-    setSalvando(m);
+  // Linhas exibidas conforme a forma de pagamento
+  const periodos = tipo === "semestral"
+    ? [{ label: "1º semestre (jan a jun)", mes: 1 }, { label: "2º semestre (jul a dez)", mes: 7 }]
+    : tipo === "anual"
+      ? [{ label: `Ano ${ano} (pagamento anual)`, mes: 1 }]
+      : MESES.map((nome, i) => ({ label: nome, mes: i + 1 }));
+  const statusDe = (mes) => (registros.find(x => x.ano === ano && x.mes === mes) || {}).status || "";
+
+  async function definir(mes, novo) {
+    setSalvando(mes);
     let erro = null;
     if (!novo) {
-      ({ error: erro } = await supabase.from("familias_mensalidades").delete().eq("aluno_id", aluno.id).eq("ano", ano).eq("mes", m + 1));
+      ({ error: erro } = await supabase.from("familias_mensalidades").delete().eq("aluno_id", aluno.id).eq("ano", ano).eq("mes", mes));
     } else {
       ({ error: erro } = await supabase.from("familias_mensalidades").upsert(
-        { aluno_id: aluno.id, ano, mes: m + 1, status: novo, atualizado_em: new Date().toISOString() },
+        { aluno_id: aluno.id, ano, mes, status: novo, atualizado_em: new Date().toISOString() },
         { onConflict: "aluno_id,ano,mes" }));
     }
     setSalvando(null);
@@ -87,7 +104,8 @@ function ModalMensalidades({ aluno, registros, onClose, onMudou }) {
           <div>
             <div style={{ fontSize: 20, fontWeight: 800, fontFamily: font }}>{aluno.aluno}</div>
             <div style={{ fontSize: 12, color: "#6D6E71", fontFamily: fontB }}>
-              Mensalidades{aluno.mensalidade ? ` · ${moeda(aluno.mensalidade)} por mês` : ""}
+              {tipo === "mensal" ? "Mensalidades" : tipo === "semestral" ? "Pagamento semestral" : "Pagamento anual"}
+              {aluno.mensalidade ? ` · ${moeda(aluno.mensalidade)}${tipo === "mensal" ? " por mês" : ""}` : ""}
             </div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#6D6E71" }}>×</button>
@@ -97,23 +115,23 @@ function ModalMensalidades({ aluno, registros, onClose, onMudou }) {
           <select value={ano} onChange={e => setAno(+e.target.value)} style={{ ...inp, width: "auto", fontWeight: 800 }}>
             {[anoAtual - 1, anoAtual, anoAtual + 1].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
-          <span style={{ fontSize: 12, color: "#6D6E71", fontFamily: fontB }}>Marque cada mês como pago ou inadimplente.</span>
+          <span style={{ fontSize: 12, color: "#6D6E71", fontFamily: fontB }}>Marque como pago ou inadimplente.</span>
         </div>
 
         <div style={{ border: "1px solid #DCDDDE", borderRadius: 6 }}>
-          {MESES.map((nome, m) => {
-            const s = statusDe(m);
+          {periodos.map((pe, i) => {
+            const s = statusDe(pe.mes);
             return (
-              <div key={nome} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", borderTop: m ? "1px solid #EEE" : "none",
-                background: s === "Inadimplente" ? "rgba(216,30,39,.07)" : "transparent", opacity: salvando === m ? .6 : 1 }}>
-                <div style={{ flex: 1, fontSize: 14, fontWeight: 700, fontFamily: fontB }}>{nome}</div>
-                <button onClick={() => definir(m, s === "Pago" ? "" : "Pago")} style={btn(s === "Pago", "#148A00", "rgba(57,223,24,.2)")}>Pago</button>
-                <button onClick={() => definir(m, s === "Inadimplente" ? "" : "Inadimplente")} style={btn(s === "Inadimplente", "#D81E27", "rgba(216,30,39,.12)")}>Inadimplente</button>
+              <div key={pe.mes} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", borderTop: i ? "1px solid #EEE" : "none",
+                background: s === "Inadimplente" ? "rgba(216,30,39,.07)" : "transparent", opacity: salvando === pe.mes ? .6 : 1 }}>
+                <div style={{ flex: 1, fontSize: 14, fontWeight: 700, fontFamily: fontB }}>{pe.label}</div>
+                <button onClick={() => definir(pe.mes, s === "Pago" ? "" : "Pago")} style={btn(s === "Pago", "#148A00", "rgba(57,223,24,.2)")}>Pago</button>
+                <button onClick={() => definir(pe.mes, s === "Inadimplente" ? "" : "Inadimplente")} style={btn(s === "Inadimplente", "#D81E27", "rgba(216,30,39,.12)")}>Inadimplente</button>
               </div>
             );
           })}
         </div>
-        <div style={{ fontSize: 11, color: "#6D6E71", fontFamily: fontB, marginTop: 8 }}>Clique de novo no botão marcado para limpar o mês.</div>
+        <div style={{ fontSize: 11, color: "#6D6E71", fontFamily: fontB, marginTop: 8 }}>Clique de novo no botão marcado para limpar.</div>
         <div style={{ textAlign: "right", marginTop: 14 }}>
           <button onClick={onClose} style={btnPrim}>Fechar</button>
         </div>
@@ -207,7 +225,7 @@ function AbaAlunos({ escola, alunos, recarregar }) {
   }, [alunos]);
   useEffect(() => { carregarMens(); }, [carregarMens]);
 
-  const inadDe = (a) => (mens[a.id] || []).filter(r => r.status === "Inadimplente").sort((x, y) => x.ano - y.ano || x.mes - y.mes);
+  const inadDe = (a) => (mens[a.id] || []).filter(r => r.status === "Inadimplente" && mesValido(tipoPgto(a), r.mes)).sort((x, y) => x.ano - y.ano || x.mes - y.mes);
 
   const lista = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -225,7 +243,7 @@ function AbaAlunos({ escola, alunos, recarregar }) {
       abertos: at.filter(a => a.status_pgto !== "Pago").length,
       emAberto: at.reduce((s, a) => s + (Number(a.em_aberto) || 0), 0),
       desistiu: alunos.filter(a => a.status === "Desistiu").length,
-      inadimplentes: at.filter(a => (mens[a.id] || []).some(r => r.status === "Inadimplente")).length,
+      inadimplentes: at.filter(a => (mens[a.id] || []).some(r => r.status === "Inadimplente" && mesValido(tipoPgto(a), r.mes))).length,
     };
   }, [alunos, mens]);
 
@@ -291,13 +309,13 @@ function AbaAlunos({ escola, alunos, recarregar }) {
               {lista.map(a => { const inad = inadDe(a); return (
                 <tr key={a.id} style={{ borderTop: "1px solid #DCDDDE", opacity: a.status === "Desistiu" ? .65 : 1, background: inad.length ? "rgba(216,30,39,.08)" : "transparent" }}>
                   <td style={{ ...td, fontWeight: 700 }}>
-                    {ehMensal(a) ? (
-                      <button onClick={() => setModalMens(a)} title="Controlar mensalidades"
+                    {tipoPgto(a) ? (
+                      <button onClick={() => setModalMens(a)} title="Controlar pagamentos"
                         style={{ background: "none", border: "none", padding: 0, font: "inherit", fontWeight: 700, cursor: "pointer", textAlign: "left", textDecoration: "underline dotted", color: inad.length ? "#D81E27" : "inherit" }}>
                         {a.aluno}
                       </button>
                     ) : a.aluno}
-                    {inad.length > 0 && <div style={{ fontSize: 11, color: "#D81E27", fontWeight: 800 }}>Inadimplente: {inad.map(r => `${MES_ABREV[r.mes - 1]}/${String(r.ano).slice(2)}`).join(", ")}</div>}
+                    {inad.length > 0 && <div style={{ fontSize: 11, color: "#D81E27", fontWeight: 800 }}>Inadimplente: {inad.map(r => rotuloPeriodo(tipoPgto(a), r)).join(", ")}</div>}
                     {a.status === "Desistiu" && <div style={{ fontSize: 11, color: "#D81E27", fontWeight: 600 }}>Desistiu{a.motivo_desistencia ? ` · ${a.motivo_desistencia}` : ""}</div>}
                     {a.observacoes && <div style={{ fontSize: 11, color: "#6D6E71", fontWeight: 400 }}>{a.observacoes}</div>}
                   </td>
@@ -325,7 +343,7 @@ function AbaAlunos({ escola, alunos, recarregar }) {
           </table>
         </div>
       )}
-      {modalMens && <ModalMensalidades aluno={modalMens} registros={mens[modalMens.id] || []} onClose={() => setModalMens(null)} onMudou={carregarMens} />}
+      {modalMens && <ModalMensalidades aluno={modalMens} tipo={tipoPgto(modalMens)} registros={mens[modalMens.id] || []} onClose={() => setModalMens(null)} onMudou={carregarMens} />}
       {modal && <ModalAluno aluno={modal} onSave={salvar} onClose={() => setModal(null)} />}
     </div>
   );
