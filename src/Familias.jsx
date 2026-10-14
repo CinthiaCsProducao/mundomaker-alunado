@@ -51,6 +51,77 @@ const lbl = { display: "flex", flexDirection: "column", gap: 4, fontSize: 11, fo
 const btnPrim = { background: VERDE, color: PRETO, border: "none", borderRadius: 6, padding: "9px 16px", fontSize: 13, fontWeight: 800, fontFamily: font, cursor: "pointer" };
 const btnSec  = { background: "#fff", color: PRETO, border: "2px solid #DCDDDE", borderRadius: 6, padding: "8px 14px", fontSize: 13, fontWeight: 700, fontFamily: font, cursor: "pointer" };
 
+const MES_ABREV = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+// Aluno com pagamento mensal: plano "Mensal" ou observação "Plano mensal"
+const ehMensal = (a) => a.plano === "Mensal" || /plano mensal/i.test(a.observacoes || "");
+
+// ── Modal: controle das mensalidades do aluno ───────────────────
+function ModalMensalidades({ aluno, registros, onClose, onMudou }) {
+  const [ano, setAno] = useState(new Date().getFullYear());
+  const [salvando, setSalvando] = useState(null);
+  const anoAtual = new Date().getFullYear();
+  const statusDe = (m) => (registros.find(x => x.ano === ano && x.mes === m + 1) || {}).status || "";
+
+  async function definir(m, novo) {
+    setSalvando(m);
+    let erro = null;
+    if (!novo) {
+      ({ error: erro } = await supabase.from("familias_mensalidades").delete().eq("aluno_id", aluno.id).eq("ano", ano).eq("mes", m + 1));
+    } else {
+      ({ error: erro } = await supabase.from("familias_mensalidades").upsert(
+        { aluno_id: aluno.id, ano, mes: m + 1, status: novo, atualizado_em: new Date().toISOString() },
+        { onConflict: "aluno_id,ano,mes" }));
+    }
+    setSalvando(null);
+    if (erro) alert("Erro ao salvar: " + erro.message);
+    onMudou();
+  }
+
+  const btn = (ativo, cor, bg) => ({ padding: "6px 12px", borderRadius: 6, fontSize: 12, fontWeight: 800, fontFamily: font, cursor: "pointer",
+    border: `2px solid ${ativo ? cor : "#DCDDDE"}`, background: ativo ? bg : "#fff", color: ativo ? cor : "#6D6E71" });
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 8, width: "100%", maxWidth: 520, maxHeight: "90vh", overflowY: "auto", padding: 24 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 800, fontFamily: font }}>{aluno.aluno}</div>
+            <div style={{ fontSize: 12, color: "#6D6E71", fontFamily: fontB }}>
+              Mensalidades{aluno.mensalidade ? ` · ${moeda(aluno.mensalidade)} por mês` : ""}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#6D6E71" }}>×</button>
+        </div>
+
+        <div style={{ margin: "16px 0 10px", display: "flex", alignItems: "center", gap: 10 }}>
+          <select value={ano} onChange={e => setAno(+e.target.value)} style={{ ...inp, width: "auto", fontWeight: 800 }}>
+            {[anoAtual - 1, anoAtual, anoAtual + 1].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <span style={{ fontSize: 12, color: "#6D6E71", fontFamily: fontB }}>Marque cada mês como pago ou inadimplente.</span>
+        </div>
+
+        <div style={{ border: "1px solid #DCDDDE", borderRadius: 6 }}>
+          {MESES.map((nome, m) => {
+            const s = statusDe(m);
+            return (
+              <div key={nome} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", borderTop: m ? "1px solid #EEE" : "none",
+                background: s === "Inadimplente" ? "rgba(216,30,39,.07)" : "transparent", opacity: salvando === m ? .6 : 1 }}>
+                <div style={{ flex: 1, fontSize: 14, fontWeight: 700, fontFamily: fontB }}>{nome}</div>
+                <button onClick={() => definir(m, s === "Pago" ? "" : "Pago")} style={btn(s === "Pago", "#148A00", "rgba(57,223,24,.2)")}>Pago</button>
+                <button onClick={() => definir(m, s === "Inadimplente" ? "" : "Inadimplente")} style={btn(s === "Inadimplente", "#D81E27", "rgba(216,30,39,.12)")}>Inadimplente</button>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 11, color: "#6D6E71", fontFamily: fontB, marginTop: 8 }}>Clique de novo no botão marcado para limpar o mês.</div>
+        <div style={{ textAlign: "right", marginTop: 14 }}>
+          <button onClick={onClose} style={btnPrim}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Modal de aluno ──────────────────────────────────────────────
 function ModalAluno({ aluno, onSave, onClose }) {
   const [f, setF] = useState({
@@ -123,6 +194,20 @@ function AbaAlunos({ escola, alunos, recarregar }) {
   const [filtro, setFiltro] = useState("Ativo");
   const [busca, setBusca] = useState("");
   const [modal, setModal] = useState(null);
+  const [mens, setMens] = useState({});            // aluno_id -> linhas de familias_mensalidades
+  const [modalMens, setModalMens] = useState(null);
+
+  const carregarMens = useCallback(async () => {
+    const ids = alunos.map(a => a.id);
+    if (!ids.length) { setMens({}); return; }
+    const { data } = await supabase.from("familias_mensalidades").select("*").in("aluno_id", ids);
+    const m = {};
+    (data || []).forEach(r => { (m[r.aluno_id] = m[r.aluno_id] || []).push(r); });
+    setMens(m);
+  }, [alunos]);
+  useEffect(() => { carregarMens(); }, [carregarMens]);
+
+  const inadDe = (a) => (mens[a.id] || []).filter(r => r.status === "Inadimplente").sort((x, y) => x.ano - y.ano || x.mes - y.mes);
 
   const lista = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -140,8 +225,9 @@ function AbaAlunos({ escola, alunos, recarregar }) {
       abertos: at.filter(a => a.status_pgto !== "Pago").length,
       emAberto: at.reduce((s, a) => s + (Number(a.em_aberto) || 0), 0),
       desistiu: alunos.filter(a => a.status === "Desistiu").length,
+      inadimplentes: at.filter(a => (mens[a.id] || []).some(r => r.status === "Inadimplente")).length,
     };
-  }, [alunos]);
+  }, [alunos, mens]);
 
   async function salvar(dados) {
     if (modal?.id) await supabase.from("familias_alunos").update(dados).eq("id", modal.id);
@@ -176,6 +262,7 @@ function AbaAlunos({ escola, alunos, recarregar }) {
         {card(totais.pagos, "Pagos", "#148A00")}
         {card(totais.abertos, "Em aberto", "#FFA300")}
         {card(moeda(totais.emAberto), "A receber", "#D81E27")}
+        {card(totais.inadimplentes, "Inadimplentes", "#D81E27")}
         {card(totais.desistiu, "Desistências", "#DCDDDE")}
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
@@ -201,10 +288,16 @@ function AbaAlunos({ escola, alunos, recarregar }) {
               </tr>
             </thead>
             <tbody>
-              {lista.map(a => (
-                <tr key={a.id} style={{ borderTop: "1px solid #DCDDDE", opacity: a.status === "Desistiu" ? .65 : 1 }}>
+              {lista.map(a => { const inad = inadDe(a); return (
+                <tr key={a.id} style={{ borderTop: "1px solid #DCDDDE", opacity: a.status === "Desistiu" ? .65 : 1, background: inad.length ? "rgba(216,30,39,.08)" : "transparent" }}>
                   <td style={{ ...td, fontWeight: 700 }}>
-                    {a.aluno}
+                    {ehMensal(a) ? (
+                      <button onClick={() => setModalMens(a)} title="Controlar mensalidades"
+                        style={{ background: "none", border: "none", padding: 0, font: "inherit", fontWeight: 700, cursor: "pointer", textAlign: "left", textDecoration: "underline dotted", color: inad.length ? "#D81E27" : "inherit" }}>
+                        {a.aluno}
+                      </button>
+                    ) : a.aluno}
+                    {inad.length > 0 && <div style={{ fontSize: 11, color: "#D81E27", fontWeight: 800 }}>Inadimplente: {inad.map(r => `${MES_ABREV[r.mes - 1]}/${String(r.ano).slice(2)}`).join(", ")}</div>}
                     {a.status === "Desistiu" && <div style={{ fontSize: 11, color: "#D81E27", fontWeight: 600 }}>Desistiu{a.motivo_desistencia ? ` · ${a.motivo_desistencia}` : ""}</div>}
                     {a.observacoes && <div style={{ fontSize: 11, color: "#6D6E71", fontWeight: 400 }}>{a.observacoes}</div>}
                   </td>
@@ -227,11 +320,12 @@ function AbaAlunos({ escola, alunos, recarregar }) {
                     <button onClick={() => remover(a)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#D81E27", fontWeight: 700 }}>✕</button>
                   </td>
                 </tr>
-              ))}
+              ); })}
             </tbody>
           </table>
         </div>
       )}
+      {modalMens && <ModalMensalidades aluno={modalMens} registros={mens[modalMens.id] || []} onClose={() => setModalMens(null)} onMudou={carregarMens} />}
       {modal && <ModalAluno aluno={modal} onSave={salvar} onClose={() => setModal(null)} />}
     </div>
   );
