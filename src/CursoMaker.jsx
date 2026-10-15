@@ -17,9 +17,9 @@ const moeda = (v) => (v === null || v === undefined || v === "") ? "—"
   : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const numOuNull = (v) => { if (v === "" || v === null || v === undefined) return null; const n = Number(String(v).replace(/\./g, "").replace(",", ".")); return isNaN(n) ? null : n; };
 const ordenaNome = (a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR", { sensitivity: "base" });
-const normDia = (s) => (s || "").trim().toUpperCase() || null;
 const normHor = (s) => (s || "").replace(/ /g, " ").replace(/\s+/g, " ").trim();
 const cap = (s) => s ? s.charAt(0) + s.slice(1).toLowerCase() : "";
+const rotuloTurma = (tu) => `${tu.nome || "Turma"} (${cap(tu.dia)}${tu.horario ? " " + tu.horario : ""})`;
 const idxDia = (d) => { const i = DIAS.indexOf(d); return i < 0 ? 99 : i; };
 const isoHoje = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 const diaDaData = (iso) => NOME_DIA_JS[new Date(iso + "T12:00:00").getDay()];
@@ -103,18 +103,16 @@ function ModalPagamentos({ aluno, registros, onClose, onMudou }) {
 }
 
 // ── Modal: cadastro do aluno ────────────────────────────────────
-function ModalAluno({ aluno, horarios, turmas, professores, onSave, onClose }) {
+function ModalAluno({ aluno, turmas, onSave, onClose }) {
   const [f, setF] = useState({
     nome: "", tipo: "RENOVAÇÃO", matricula: "", nascimento: "", escola_estuda: "", responsavel: "", cpf: "", telefone: "", email: "",
     plano: "SEMESTRAL", endereco: "", dia: "", horario: "", valor: "", faltando: "", forma_pagamento: "", status_pgto: "", contrato: "",
     conta_azul: "", observacoes: "", status: "Ativo", ...Object.fromEntries(Object.entries(aluno).map(([k, v]) => [k, v ?? ""])),
   });
   const [salvando, setSalvando] = useState(false);
-  const [profEscolhido, setProfEscolhido] = useState(null);   // null = não mexeu no professor
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
-  // O professor é da turma (dia + horário): mostra o professor atual dessa turma
-  const turmaAtual = turmas.find(tu => tu.dia === normDia(f.dia) && (tu.horario || "") === normHor(f.horario));
-  const profValor = profEscolhido !== null ? profEscolhido : (turmaAtual?.professor_email || "").toLowerCase();
+  const turmaSel = turmas.find(tu => tu.id === f.turma_id) || null;
+  const turmasOrd = [...turmas].sort((x, y) => idxDia(x.dia) - idxDia(y.dia) || (x.horario || "").localeCompare(y.horario || "", "pt-BR", { numeric: true }) || (x.nome || "").localeCompare(y.nome || "", "pt-BR"));
   const campo = (k, label, extra = {}) => (
     <label style={{ ...lbl, gridColumn: extra.full ? "1 / -1" : undefined }}>{label}
       {extra.options ? (
@@ -136,10 +134,10 @@ function ModalAluno({ aluno, horarios, turmas, professores, onSave, onClose }) {
     await onSave({
       nome: f.nome.trim(), tipo: f.tipo || null, matricula: f.matricula || null, nascimento: f.nascimento || null,
       escola_estuda: f.escola_estuda || null, responsavel: f.responsavel || null, cpf: f.cpf || null, telefone: f.telefone || null,
-      email: f.email || null, plano: f.plano || null, endereco: f.endereco || null, dia: normDia(f.dia), horario: normHor(f.horario) || null,
+      email: f.email || null, plano: f.plano || null, endereco: f.endereco || null, turma_id: f.turma_id || null,
       valor: numOuNull(f.valor), faltando: numOuNull(f.faltando), forma_pagamento: f.forma_pagamento || null, status_pgto: f.status_pgto || null,
       contrato: f.contrato || null, conta_azul: f.conta_azul || null, observacoes: f.observacoes || null, status: f.status || "Ativo",
-    }, profEscolhido);
+    });
     setSalvando(false);
   }
 
@@ -147,7 +145,6 @@ function ModalAluno({ aluno, horarios, turmas, professores, onSave, onClose }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
       <div style={{ background: "#fff", borderRadius: 8, width: "100%", maxWidth: 720, maxHeight: "92vh", overflowY: "auto", padding: 24 }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 20, fontWeight: 800, fontFamily: font, marginBottom: 14 }}>{aluno.id ? "Editar aluno" : "Novo aluno"}</div>
-        <datalist id="cm-horarios">{horarios.map(h => <option key={h} value={h} />)}</datalist>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {campo("nome", "Nome do maker", { full: true })}
           {campo("tipo", "Tipo", { options: TIPOS })}
@@ -162,16 +159,13 @@ function ModalAluno({ aluno, horarios, turmas, professores, onSave, onClose }) {
           {campo("endereco", "Endereço", { full: true })}
           {campo("plano", "Plano", { options: PLANOS, vazio: true })}
           {campo("forma_pagamento", "Forma de pagamento")}
-          {campo("dia", "Dia do curso", { options: DIAS, vazio: true })}
-          {campo("horario", "Horário", { list: "cm-horarios" })}
-          <label style={{ ...lbl, gridColumn: "1 / -1" }}>Professor da turma
-            <select value={profValor} onChange={e => setProfEscolhido(e.target.value)} disabled={!f.dia} style={{ ...inp, opacity: f.dia ? 1 : .6 }}>
-              <option value="">— sem professor —</option>
-              {professores.map(pr => <option key={pr.email} value={pr.email.toLowerCase()}>{pr.nome}</option>)}
-              {profValor && !professores.some(pr => pr.email.toLowerCase() === profValor) && <option value={profValor}>{turmaAtual?.professor_nome || profValor}</option>}
+          <label style={{ ...lbl, gridColumn: "1 / -1" }}>Turma
+            <select value={f.turma_id || ""} onChange={e => set("turma_id", e.target.value)} style={inp}>
+              <option value="">— sem turma —</option>
+              {turmasOrd.map(tu => <option key={tu.id} value={tu.id}>{rotuloTurma(tu)}{tu.professor_nome ? ` · Prof. ${tu.professor_nome}` : ""}</option>)}
             </select>
             <span style={{ fontSize: 11, fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "#6D6E71" }}>
-              {f.dia ? "O professor vale para toda a turma deste dia e horário." : "Escolha o dia do curso para definir o professor."}
+              {turmaSel ? `Professor: ${turmaSel.professor_nome || "não definido"}.` : "Sem turma, o aluno não aparece na lista de chamada."} Crie e edite turmas na aba Turmas e professores.
             </span>
           </label>
           {campo("valor", "Valor (R$)")}
@@ -191,19 +185,15 @@ function ModalAluno({ aluno, horarios, turmas, professores, onSave, onClose }) {
 }
 
 // ── Aba: Alunos ─────────────────────────────────────────────────
-function AbaAlunos({ alunos, turmas, professores, pagamentos, recarregar, podeExcluir }) {
+function AbaAlunos({ alunos, turmas, pagamentos, recarregar, podeExcluir }) {
   const [filtro, setFiltro] = useState("Ativo");
   const [diaSel, setDiaSel] = useState("");
   const [busca, setBusca] = useState("");
   const [modal, setModal] = useState(null);
   const [modalPgto, setModalPgto] = useState(null);
 
-  const profDe = useCallback((a) => {
-    const t = turmas.find(x => x.dia === a.dia && (x.horario || "") === (a.horario || ""));
-    return t?.professor_nome || "";
-  }, [turmas]);
+  const profDe = useCallback((a) => turmas.find(x => x.id === a.turma_id)?.professor_nome || "", [turmas]);
   const inadDe = (a) => (pagamentos[a.id] || []).filter(r => r.status === "Inadimplente").sort((x, y) => x.ano - y.ano || x.mes - y.mes);
-  const horarios = useMemo(() => [...new Set(alunos.map(a => a.horario).filter(Boolean))].sort(), [alunos]);
 
   const lista = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -225,23 +215,11 @@ function AbaAlunos({ alunos, turmas, professores, pagamentos, recarregar, podeEx
     };
   }, [alunos, pagamentos]);
 
-  async function salvar(dados, prof) {
+  async function salvar(dados) {
     let erro;
     if (modal?.id) ({ error: erro } = await supabase.from("cm_alunos").update(dados).eq("id", modal.id));
     else ({ error: erro } = await supabase.from("cm_alunos").insert(dados));
     if (erro) { alert("Erro ao salvar: " + erro.message); return; }
-    if (dados.dia) {
-      if (prof !== null && prof !== undefined) {
-        // professor escolhido no cadastro: grava na turma (dia + horário)
-        const p = professores.find(x => x.email.toLowerCase() === prof);
-        const nomeAntigo = turmas.find(tu => (tu.professor_email || "").toLowerCase() === prof)?.professor_nome || null;
-        await supabase.from("cm_turmas").upsert(
-          { dia: dados.dia, horario: dados.horario || "", professor_email: prof || null, professor_nome: prof ? (p ? p.nome : nomeAntigo) : null },
-          { onConflict: "dia,horario" });
-      } else {
-        await supabase.from("cm_turmas").upsert({ dia: dados.dia, horario: dados.horario || "" }, { onConflict: "dia,horario", ignoreDuplicates: true });
-      }
-    }
     setModal(null);
     recarregar();
   }
@@ -252,8 +230,8 @@ function AbaAlunos({ alunos, turmas, professores, pagamentos, recarregar, podeEx
     recarregar();
   }
   function exportar() {
-    const linhas = [["Aluno","Tipo","Matrícula","Nascimento","Escola","Responsável","CPF","Telefone","E-mail","Plano","Dia","Horário","Professor","Valor","Faltando","Forma de pagamento","Status pgto","Contrato","Conta Azul","Situação","Observações"]];
-    lista.forEach(a => linhas.push([a.nome,a.tipo,a.matricula,a.nascimento,a.escola_estuda,a.responsavel,a.cpf,a.telefone,a.email,a.plano,a.dia,a.horario,profDe(a),a.valor,a.faltando,a.forma_pagamento,a.status_pgto,a.contrato,a.conta_azul,a.status,a.observacoes]));
+    const linhas = [["Aluno","Tipo","Matrícula","Nascimento","Escola","Responsável","CPF","Telefone","E-mail","Plano","Turma","Dia","Horário","Professor","Valor","Faltando","Forma de pagamento","Status pgto","Contrato","Conta Azul","Situação","Observações"]];
+    lista.forEach(a => linhas.push([a.nome,a.tipo,a.matricula,a.nascimento,a.escola_estuda,a.responsavel,a.cpf,a.telefone,a.email,a.plano,a.turma_nome,a.dia,a.horario,profDe(a),a.valor,a.faltando,a.forma_pagamento,a.status_pgto,a.contrato,a.conta_azul,a.status,a.observacoes]));
     baixarCSV("CursoMaker_alunos.csv", linhas);
   }
 
@@ -297,7 +275,7 @@ function AbaAlunos({ alunos, turmas, professores, pagamentos, recarregar, podeEx
         <div style={{ overflowX: "auto", border: "1px solid #DCDDDE", borderRadius: 6 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: fontB }}>
             <thead>
-              <tr>{["Aluno", "Responsável", "Telefone", "Escola", "Plano", "Dia / horário", "Professor", "Valor", "Faltando", "Pgto", "Tipo", ""].map(h => <th key={h} style={th}>{h}</th>)}</tr>
+              <tr>{["Aluno", "Responsável", "Telefone", "Escola", "Plano", "Turma", "Professor", "Valor", "Faltando", "Pgto", "Tipo", ""].map(h => <th key={h} style={th}>{h}</th>)}</tr>
             </thead>
             <tbody>
               {lista.map(a => { const inad = inadDe(a); return (
@@ -315,7 +293,7 @@ function AbaAlunos({ alunos, turmas, professores, pagamentos, recarregar, podeEx
                   <td style={td}>{a.telefone || "—"}</td>
                   <td style={td}>{a.escola_estuda || "—"}</td>
                   <td style={td}>{a.plano ? cap(a.plano) : "—"}</td>
-                  <td style={td}>{a.dia ? `${cap(a.dia)}${a.horario ? " · " + a.horario : ""}` : "—"}</td>
+                  <td style={td}>{a.turma_nome ? <b>{a.turma_nome}</b> : "—"}{a.dia && <div style={{ fontSize: 11, color: "#6D6E71" }}>{cap(a.dia)}{a.horario ? " · " + a.horario : ""}</div>}</td>
                   <td style={td}>{profDe(a) || "—"}</td>
                   <td style={td}>{moeda(a.valor)}</td>
                   <td style={td}>{moeda(a.faltando)}</td>
@@ -331,7 +309,7 @@ function AbaAlunos({ alunos, turmas, professores, pagamentos, recarregar, podeEx
           </table>
         </div>
       )}
-      {modal && <ModalAluno aluno={modal} horarios={horarios} turmas={turmas} professores={professores} onSave={salvar} onClose={() => setModal(null)} />}
+      {modal && <ModalAluno aluno={modal} turmas={turmas} onSave={salvar} onClose={() => setModal(null)} />}
       {modalPgto && <ModalPagamentos aluno={modalPgto} registros={pagamentos[modalPgto.id] || []} onClose={() => setModalPgto(null)} onMudou={recarregar} />}
     </div>
   );
@@ -361,22 +339,17 @@ function AbaChamada({ alunos, turmas, modoProfessor }) {
   useEffect(() => { carregar(); }, [carregar]);
 
   const diaNome = diaDaData(data);
-  const profDeTurma = useCallback((dia, horario) => turmas.find(t => t.dia === dia && (t.horario || "") === (horario || "")) || null, [turmas]);
   const professores = useMemo(() => [...new Set(turmas.map(t => t.professor_nome).filter(Boolean))].sort(), [turmas]);
 
   const grupos = useMemo(() => {
-    const doDia = ativos.filter(a => a.dia === diaNome);
+    const doDia = ativos.filter(a => a.dia === diaNome && a.turma_id);
     const mapa = new Map();
-    doDia.forEach(a => {
-      const h = a.horario || "";
-      if (!mapa.has(h)) mapa.set(h, []);
-      mapa.get(h).push(a);
-    });
+    doDia.forEach(a => { if (!mapa.has(a.turma_id)) mapa.set(a.turma_id, []); mapa.get(a.turma_id).push(a); });
     return [...mapa.entries()]
-      .map(([horario, lista]) => ({ horario, lista: lista.sort(ordenaNome), prof: profDeTurma(diaNome, horario)?.professor_nome || "" }))
+      .map(([id, lista]) => { const tu = turmas.find(x => x.id === id) || {}; return { id, nome: tu.nome || "Turma", horario: tu.horario || "", lista: lista.sort(ordenaNome), prof: tu.professor_nome || "" }; })
       .filter(g => !profSel || (profSel === "__sem__" ? !g.prof : g.prof === profSel))
-      .sort((x, y) => x.horario.localeCompare(y.horario, "pt-BR", { numeric: true }));
-  }, [ativos, diaNome, profSel, profDeTurma]);
+      .sort((x, y) => x.horario.localeCompare(y.horario, "pt-BR", { numeric: true }) || x.nome.localeCompare(y.nome, "pt-BR"));
+  }, [ativos, diaNome, profSel, turmas]);
 
   const regDoDia = (alunoId) => rows.find(r => r.aluno_id === alunoId && r.data === data) || null;
   const freq = (alunoId) => {
@@ -394,8 +367,8 @@ function AbaChamada({ alunos, turmas, modoProfessor }) {
   const marcar = (alunoId) => gravar(alunoId, { status: CICLO[(regDoDia(alunoId) || {}).status || ""] || null });
 
   function exportar() {
-    const linhas = [["Data", "Dia", "Horário", "Professor", "Aluno", "Presença", "Observações"]];
-    grupos.forEach(g => g.lista.forEach(a => { const r = regDoDia(a.id) || {}; linhas.push([data, cap(diaNome), g.horario, g.prof, a.nome, r.status, r.obs]); }));
+    const linhas = [["Data", "Dia", "Turma", "Horário", "Professor", "Aluno", "Presença", "Observações"]];
+    grupos.forEach(g => g.lista.forEach(a => { const r = regDoDia(a.id) || {}; linhas.push([data, cap(diaNome), g.nome, g.horario, g.prof, a.nome, r.status, r.obs]); }));
     baixarCSV(`Chamada_CursoMaker_${data}.csv`, linhas);
   }
 
@@ -427,9 +400,10 @@ function AbaChamada({ alunos, turmas, modoProfessor }) {
       ) : grupos.length === 0 ? (
         <div style={{ color: "#6D6E71", fontStyle: "italic", fontSize: 14 }}>Nenhuma turma neste dia{profSel ? " para esse professor" : ""}.</div>
       ) : grupos.map(g => (
-        <div key={g.horario} style={{ border: "1px solid #DCDDDE", borderRadius: 6, marginBottom: 16, overflow: "hidden" }}>
+        <div key={g.id} style={{ border: "1px solid #DCDDDE", borderRadius: 6, marginBottom: 16, overflow: "hidden" }}>
           <div style={{ background: PRETO, color: "#fff", padding: "10px 14px", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "baseline" }}>
-            <b style={{ fontFamily: font, fontSize: 15 }}>{g.horario || "Horário a definir"}</b>
+            <b style={{ fontFamily: font, fontSize: 15 }}>{g.nome}</b>
+            <span style={{ fontSize: 12, color: "#C7C8CA" }}>{g.horario || "horário a definir"}</span>
             <span style={{ fontSize: 12, color: "#C7C8CA" }}>{g.prof ? `Prof. ${g.prof}` : "Sem professor"}</span>
             <span style={{ fontSize: 12, color: VERDE, marginLeft: "auto" }}>{g.lista.length} aluno{g.lista.length !== 1 ? "s" : ""}</span>
           </div>
@@ -471,52 +445,165 @@ function AbaChamada({ alunos, turmas, modoProfessor }) {
 }
 
 // ── Aba: Turmas e professores ───────────────────────────────────
-function AbaTurmas({ alunos, turmas, professores, recarregar }) {
-  const lista = useMemo(() => {
-    const mapa = new Map();
-    turmas.forEach(t => mapa.set(`${t.dia}|${t.horario || ""}`, { dia: t.dia, horario: t.horario || "", professor_email: t.professor_email || "", professor_nome: t.professor_nome || "" }));
-    alunos.filter(a => a.dia).forEach(a => {
-      const k = `${a.dia}|${a.horario || ""}`;
-      if (!mapa.has(k)) mapa.set(k, { dia: a.dia, horario: a.horario || "", professor_email: "", professor_nome: "" });
+async function hashSenha(senha) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(senha));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function ModalTurma({ turma, professores, onSave, onClose }) {
+  const [f, setF] = useState({ nome: turma.nome || "", dia: turma.dia || "", horario: turma.horario || "", professor_email: (turma.professor_email || "").toLowerCase() });
+  const [salvando, setSalvando] = useState(false);
+  const set = (k, v) => setF(x => ({ ...x, [k]: v }));
+  async function salvar() {
+    if (!f.nome.trim()) { alert("Dê um nome para a turma."); return; }
+    if (!f.dia) { alert("Escolha o dia da semana."); return; }
+    const p = professores.find(x => x.email.toLowerCase() === f.professor_email);
+    setSalvando(true);
+    await onSave({
+      nome: f.nome.trim(), dia: f.dia, horario: normHor(f.horario),
+      professor_email: f.professor_email || null,
+      professor_nome: f.professor_email ? (p ? p.nome : turma.professor_nome || null) : null,
     });
-    return [...mapa.values()].sort((x, y) => idxDia(x.dia) - idxDia(y.dia) || x.horario.localeCompare(y.horario, "pt-BR", { numeric: true }));
-  }, [alunos, turmas]);
+    setSalvando(false);
+  }
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 8, width: "100%", maxWidth: 460, padding: 24 }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 20, fontWeight: 800, fontFamily: font, marginBottom: 14 }}>{turma.id ? "Editar turma" : "Nova turma"}</div>
+        <div style={{ display: "grid", gap: 12 }}>
+          <label style={lbl}>Nome da turma<input value={f.nome} onChange={e => set("nome", e.target.value)} style={inp} placeholder="Ex.: Quinta tarde A" autoFocus /></label>
+          <label style={lbl}>Dia da semana
+            <select value={f.dia} onChange={e => set("dia", e.target.value)} style={inp}>
+              <option value="">—</option>
+              {DIAS.map(d => <option key={d} value={d}>{cap(d)}</option>)}
+            </select>
+          </label>
+          <label style={lbl}>Horário<input value={f.horario} onChange={e => set("horario", e.target.value)} style={inp} placeholder="Ex.: 16h20 às 18h" /></label>
+          <label style={lbl}>Professor
+            <select value={f.professor_email} onChange={e => set("professor_email", e.target.value)} style={inp}>
+              <option value="">— sem professor —</option>
+              {professores.map(pr => <option key={pr.email} value={pr.email.toLowerCase()}>{pr.nome}</option>)}
+              {f.professor_email && !professores.some(pr => pr.email.toLowerCase() === f.professor_email) && <option value={f.professor_email}>{turma.professor_nome || f.professor_email}</option>}
+            </select>
+          </label>
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18 }}>
+          <button onClick={onClose} style={btnSec}>Cancelar</button>
+          <button onClick={salvar} disabled={salvando} style={{ ...btnPrim, opacity: salvando ? .6 : 1 }}>{salvando ? "Salvando..." : "Salvar"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const qtd = (t) => alunos.filter(a => a.status === "Ativo" && a.dia === t.dia && (a.horario || "") === t.horario).length;
+// Cadastra um professor: cria o usuário (só com a permissão de professor) e envia o e-mail para ele criar a senha
+function ModalProfessor({ onFeito, onClose }) {
+  const [nome, setNome] = useState("");
+  const [email, setEmail] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  async function salvar() {
+    const em = email.trim().toLowerCase();
+    if (!nome.trim() || !em) { alert("Preencha o nome e o e-mail."); return; }
+    setSalvando(true);
+    const rnd = Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2, "0")).join("");
+    const { error } = await supabase.from("usuarios").insert([{
+      email: em, nome: nome.trim(), ativo: true, senha: await hashSenha(rnd),
+      permissoes: { historico: false, escolas: false, inspiramaker: false, projecao: false, baseEscolas: false, familias: false, cursoMaker: false, cmProfessor: true, admin: false, popsAreas: [], chamadaEscolas: [] },
+    }]);
+    if (error) {
+      setSalvando(false);
+      alert(/duplicate|unique|23505/i.test(error.message + (error.code || ""))
+        ? "Esse e-mail já está cadastrado em Usuários. Abra o usuário lá e marque a permissão \"Curso Maker: professor\"."
+        : "Erro ao cadastrar: " + error.message);
+      return;
+    }
+    const { error: errEmail } = await supabase.auth.signInWithOtp({ email: em, options: { shouldCreateUser: true, emailRedirectTo: window.location.origin + "/dashboard" } });
+    setSalvando(false);
+    alert(errEmail
+      ? `Professor cadastrado, mas o e-mail não foi enviado (${errEmail.message}). Use "Enviar acesso" em Usuários.`
+      : `Professor cadastrado! Enviamos para ${em} um e-mail com o link para criar a senha.`);
+    onFeito();
+  }
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 8, width: "100%", maxWidth: 440, padding: 24 }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 20, fontWeight: 800, fontFamily: font, marginBottom: 6 }}>Cadastrar professor</div>
+        <div style={{ fontSize: 12, color: "#6D6E71", marginBottom: 14, fontFamily: fontB }}>Ele recebe um e-mail para criar a senha e, ao entrar, vê só a chamada das turmas dele.</div>
+        <div style={{ display: "grid", gap: 12 }}>
+          <label style={lbl}>Nome<input value={nome} onChange={e => setNome(e.target.value)} style={inp} autoFocus /></label>
+          <label style={lbl}>E-mail<input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inp} /></label>
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18 }}>
+          <button onClick={onClose} style={btnSec}>Cancelar</button>
+          <button onClick={salvar} disabled={salvando} style={{ ...btnPrim, opacity: salvando ? .6 : 1 }}>{salvando ? "Cadastrando..." : "Cadastrar e enviar e-mail"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  async function escolher(t, email) {
-    const p = professores.find(x => x.email === email);
-    const { error } = await supabase.from("cm_turmas").upsert(
-      { dia: t.dia, horario: t.horario, professor_email: p ? p.email.toLowerCase() : null, professor_nome: p ? p.nome : null },
-      { onConflict: "dia,horario" });
+function AbaTurmas({ alunos, turmas, professores, recarregar, ehAdmin }) {
+  const [modal, setModal] = useState(null);
+  const [modalProf, setModalProf] = useState(false);
+
+  const lista = useMemo(() => [...turmas].sort((x, y) => idxDia(x.dia) - idxDia(y.dia) || (x.horario || "").localeCompare(y.horario || "", "pt-BR", { numeric: true }) || (x.nome || "").localeCompare(y.nome || "", "pt-BR")), [turmas]);
+  const qtd = (tu) => alunos.filter(a => a.status === "Ativo" && a.turma_id === tu.id).length;
+
+  async function salvar(dados) {
+    const { error } = modal?.id
+      ? await supabase.from("cm_turmas").update(dados).eq("id", modal.id)
+      : await supabase.from("cm_turmas").insert(dados);
+    if (error) { alert("Erro ao salvar a turma: " + error.message); return; }
+    setModal(null);
+    recarregar();
+  }
+  async function trocarProfessor(tu, email) {
+    const p = professores.find(x => x.email.toLowerCase() === email);
+    const { error } = await supabase.from("cm_turmas").update({ professor_email: email || null, professor_nome: email ? (p ? p.nome : tu.professor_nome) : null }).eq("id", tu.id);
     if (error) { alert("Erro ao salvar: " + error.message); return; }
+    recarregar();
+  }
+  async function excluir(tu) {
+    const n = alunos.filter(a => a.turma_id === tu.id).length;
+    if (!window.confirm(`Excluir a turma "${tu.nome}"?${n ? `\n\n${n} aluno(s) ficarão sem turma (não saem do cadastro).` : ""}`)) return;
+    const { error } = await supabase.from("cm_turmas").delete().eq("id", tu.id);
+    if (error) { alert("Erro ao excluir: " + error.message); return; }
     recarregar();
   }
 
   return (
     <div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14, alignItems: "center" }}>
+        <button onClick={() => setModal({})} style={btnPrim}>+ Nova turma</button>
+        {ehAdmin && <button onClick={() => setModalProf(true)} style={btnSec}>+ Cadastrar professor</button>}
+        <span style={{ fontSize: 12, color: "#6D6E71", fontFamily: fontB }}>{lista.length} turma{lista.length !== 1 ? "s" : ""} · {professores.length} professor{professores.length !== 1 ? "es" : ""}</span>
+      </div>
       {professores.length === 0 && (
         <div style={{ background: "#FFF8E1", border: "1px solid #FFE082", color: "#8a6d00", borderRadius: 6, padding: 12, fontSize: 13, marginBottom: 14 }}>
-          Nenhum professor disponível. Em <b>Usuários</b>, marque a permissão <b>Curso Maker: professor</b> nas pessoas que dão aula e elas aparecem aqui.
+          Nenhum professor cadastrado ainda.{ehAdmin ? " Clique em + Cadastrar professor." : " Peça a um administrador para cadastrar."}
         </div>
       )}
       <div style={{ border: "1px solid #DCDDDE", borderRadius: 6, overflow: "hidden" }}>
-        {lista.length === 0 && <div style={{ padding: 16, color: "#6D6E71", fontStyle: "italic" }}>Nenhuma turma ainda. Cadastre alunos com dia e horário.</div>}
-        {lista.map((t, i) => (
-          <div key={`${t.dia}|${t.horario}`} style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", padding: "10px 14px", borderTop: i ? "1px solid #EEE" : "none" }}>
-            <div style={{ minWidth: 200 }}>
-              <b style={{ fontFamily: font, fontSize: 14 }}>{cap(t.dia)}</b>
-              <span style={{ fontSize: 13, color: "#444", marginLeft: 8 }}>{t.horario || "horário a definir"}</span>
-              <div style={{ fontSize: 11, color: "#6D6E71" }}>{qtd(t)} aluno{qtd(t) !== 1 ? "s" : ""} ativo{qtd(t) !== 1 ? "s" : ""}</div>
+        {lista.length === 0 && <div style={{ padding: 16, color: "#6D6E71", fontStyle: "italic" }}>Nenhuma turma ainda. Clique em + Nova turma.</div>}
+        {lista.map((tu, i) => (
+          <div key={tu.id} style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", padding: "10px 14px", borderTop: i ? "1px solid #EEE" : "none" }}>
+            <div style={{ flex: "1 1 220px", minWidth: 200 }}>
+              <b style={{ fontFamily: font, fontSize: 14 }}>{tu.nome}</b>
+              <div style={{ fontSize: 12, color: "#444" }}>{cap(tu.dia)}{tu.horario ? ` · ${tu.horario}` : " · horário a definir"}</div>
+              <div style={{ fontSize: 11, color: "#6D6E71" }}>{qtd(tu)} aluno{qtd(tu) !== 1 ? "s" : ""} ativo{qtd(tu) !== 1 ? "s" : ""}</div>
             </div>
-            <select value={t.professor_email} onChange={e => escolher(t, e.target.value)} style={{ ...inp, width: "auto", minWidth: 220 }}>
+            <select value={(tu.professor_email || "").toLowerCase()} onChange={e => trocarProfessor(tu, e.target.value)} style={{ ...inp, width: "auto", minWidth: 220 }}>
               <option value="">— sem professor —</option>
-              {professores.map(p => <option key={p.email} value={p.email.toLowerCase()}>{p.nome}</option>)}
-              {t.professor_email && !professores.some(p => p.email.toLowerCase() === t.professor_email) && <option value={t.professor_email}>{t.professor_nome || t.professor_email}</option>}
+              {professores.map(pr => <option key={pr.email} value={pr.email.toLowerCase()}>{pr.nome}</option>)}
+              {tu.professor_email && !professores.some(pr => pr.email.toLowerCase() === tu.professor_email.toLowerCase()) && <option value={tu.professor_email.toLowerCase()}>{tu.professor_nome || tu.professor_email}</option>}
             </select>
+            <button onClick={() => setModal(tu)} style={btnSec}>✏️ Editar</button>
+            <button onClick={() => excluir(tu)} style={{ ...btnSec, color: "#D81E27", borderColor: "#D81E27" }}>Excluir</button>
           </div>
         ))}
       </div>
+      {modal && <ModalTurma turma={modal} professores={professores} onSave={salvar} onClose={() => setModal(null)} />}
+      {modalProf && <ModalProfessor onFeito={() => { setModalProf(false); recarregar(); }} onClose={() => setModalProf(false)} />}
     </div>
   );
 }
@@ -551,7 +638,7 @@ function AbaAniversarios({ alunos, turmas }) {
   const doMes = comData.filter(x => x.v.mes === mes).sort((x, y) => x.v.dia - y.v.dia || ordenaNome(x.a, y.a));
   const hoje = doMes.filter(x => mes === mesAtual && x.v.dia === agora.getDate()).length;
   const proximos7 = doMes.filter(x => mes === mesAtual && x.v.dia > agora.getDate() && x.v.dia <= agora.getDate() + 7).length;
-  const profDe = (a) => turmas.find(tu => tu.dia === a.dia && (tu.horario || "") === (a.horario || ""))?.professor_nome || "";
+  const profDe = (a) => turmas.find(tu => tu.id === a.turma_id)?.professor_nome || "";
   const idadeQueFaz = (v) => v.ano ? agora.getFullYear() - v.ano : null;
 
   function exportar() {
@@ -618,6 +705,7 @@ function AbaAniversarios({ alunos, turmas }) {
 // ── Página ──────────────────────────────────────────────────────
 // modoProfessor: só a lista de chamada das turmas do professor (sem dados pessoais nem financeiros)
 export default function CursoMaker({ onVoltar, modoProfessor = false, onSair, nomeUsuario = "", podeExcluir = false }) {
+  const ehAdmin = podeExcluir;
   const [alunos, setAlunos] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [pagamentos, setPagamentos] = useState({});
@@ -631,8 +719,9 @@ export default function CursoMaker({ onVoltar, modoProfessor = false, onSair, no
     if (modoProfessor) {
       const [t, a] = await Promise.all([supabase.rpc("cm_prof_turmas"), supabase.rpc("cm_prof_alunos")]);
       if (t.error || a.error) setErro("Erro ao carregar: " + (t.error?.message || a.error?.message));
-      setTurmas(t.data || []);
-      setAlunos((a.data || []).map(x => ({ ...x, status: "Ativo" })));
+      const tu = t.data || [];
+      setTurmas(tu);
+      setAlunos((a.data || []).map(x => { const te = tu.find(y => y.id === x.turma_id); return { ...x, status: "Ativo", dia: te?.dia || null, horario: te?.horario || null, turma_nome: te?.nome || null }; }));
       setCarregando(false);
       return;
     }
@@ -645,8 +734,10 @@ export default function CursoMaker({ onVoltar, modoProfessor = false, onSair, no
     if (a.error || t.error || p.error) setErro("Erro ao carregar: " + (a.error?.message || t.error?.message || p.error?.message));
     const m = {};
     (p.data || []).forEach(r => { (m[r.aluno_id] = m[r.aluno_id] || []).push(r); });
-    setAlunos(a.data || []);
-    setTurmas(t.data || []);
+    const tur = t.data || [];
+    // dia, horário e nome vêm da turma do aluno
+    setAlunos((a.data || []).map(x => { const te = tur.find(y => y.id === x.turma_id); return { ...x, dia: te?.dia || null, horario: te?.horario || null, turma_nome: te?.nome || null }; }));
+    setTurmas(tur);
     setPagamentos(m);
     setProfessores(pr.data || []);
     setCarregando(false);
@@ -693,10 +784,10 @@ export default function CursoMaker({ onVoltar, modoProfessor = false, onSair, no
           <div style={{ padding: 24 }}>
             {carregando ? <div style={{ padding: 24, textAlign: "center", color: "#aaa" }}>Carregando...</div> : (
               <>
-                {aba === "alunos" && !modoProfessor && <AbaAlunos alunos={alunos} turmas={turmas} professores={professores} pagamentos={pagamentos} recarregar={carregar} podeExcluir={podeExcluir} />}
+                {aba === "alunos" && !modoProfessor && <AbaAlunos alunos={alunos} turmas={turmas} pagamentos={pagamentos} recarregar={carregar} podeExcluir={podeExcluir} />}
                 {aba === "chamada" && <AbaChamada alunos={alunos} turmas={turmas} modoProfessor={modoProfessor} />}
                 {aba === "aniversarios" && !modoProfessor && <AbaAniversarios alunos={alunos} turmas={turmas} />}
-                {aba === "turmas" && !modoProfessor && <AbaTurmas alunos={alunos} turmas={turmas} professores={professores} recarregar={carregar} />}
+                {aba === "turmas" && !modoProfessor && <AbaTurmas alunos={alunos} turmas={turmas} professores={professores} recarregar={carregar} ehAdmin={ehAdmin} />}
               </>
             )}
           </div>
