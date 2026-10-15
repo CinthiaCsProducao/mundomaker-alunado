@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "./supabaseClient";
+import SinoNotificacoes from "./Notificacoes";
 
 const font  = "'Figtree','Circular Std','Segoe UI',system-ui,sans-serif";
 const fontB = "'Barlow','DIN Round Pro','Segoe UI',system-ui,sans-serif";
@@ -754,7 +755,10 @@ export default function CursoMaker({ onVoltar, modoProfessor = false, onSair, no
           {modoProfessor ? (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 8 }}>
               <span style={{ fontSize: 12, color: "#C7C8CA", fontFamily: font }}>{nomeUsuario}</span>
-              <button onClick={onSair} style={{ background: VERDE, color: PRETO, border: "none", borderRadius: 4, padding: "6px 14px", fontSize: 12, fontWeight: 800, fontFamily: font, cursor: "pointer" }}>SAIR</button>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <SinoNotificacoes tema="escuro" />
+                <button onClick={onSair} style={{ background: VERDE, color: PRETO, border: "none", borderRadius: 4, padding: "6px 14px", fontSize: 12, fontWeight: 800, fontFamily: font, cursor: "pointer" }}>SAIR</button>
+              </div>
             </div>
           ) : (
             <button onClick={onVoltar} style={{ background: "none", border: "none", color: "#aaa", fontSize: 12, cursor: "pointer", fontFamily: font, padding: 0, marginBottom: 6, display: "block" }}>← Voltar ao Dashboard</button>

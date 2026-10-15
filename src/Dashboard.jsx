@@ -8,6 +8,7 @@ import HistoricoRomaneios from "./HistoricoRomaneios";
 import PopsDocumentos from "./PopsDocumentos";
 import Familias from "./Familias";
 import CursoMaker from "./CursoMaker";
+import SinoNotificacoes from "./Notificacoes";
 import { supabase } from "./supabaseClient";
 
 // Detecta (antes do Supabase limpar a URL) se a pessoa chegou por um link enviado por e-mail
@@ -2179,6 +2180,7 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="mm-acoes" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <SinoNotificacoes tema="claro" />
           <div style={{ position: "relative" }}>
             <button onClick={() => setMenuAberto(m => !m)}
               style={{ background: "#000", color: "#fff", border: "none", borderRadius: 4, padding: "9px 18px", fontSize: 13, fontWeight: 800, fontFamily: font, cursor: "pointer", whiteSpace: "nowrap" }}>

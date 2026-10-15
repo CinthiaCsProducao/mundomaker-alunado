@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "./supabaseClient";
+import SinoNotificacoes from "./Notificacoes";
 
 const font  = "'Figtree','Circular Std','Segoe UI',system-ui,sans-serif";
 const fontB = "'Barlow','DIN Round Pro','Segoe UI',system-ui,sans-serif";
@@ -143,7 +144,7 @@ function ModalMensalidades({ aluno, tipo, registros, onClose, onMudou }) {
 // ── Modal de aluno ──────────────────────────────────────────────
 function ModalAluno({ aluno, onSave, onClose }) {
   const [f, setF] = useState({
-    aluno: "", responsavel: "", telefone: "", email: "", turma: "", plano: "", mensalidade: "", desconto: "",
+    aluno: "", nascimento: "", responsavel: "", telefone: "", email: "", turma: "", plano: "", mensalidade: "", desconto: "",
     valor_pago: "", em_aberto: "", status_pgto: "", tipo: "", observacoes: "", previsao_2s: "", status: "Ativo", motivo_desistencia: "",
     ...Object.fromEntries(Object.entries(aluno || {}).map(([k, v]) => [k, v ?? ""])),
   });
@@ -164,7 +165,7 @@ function ModalAluno({ aluno, onSave, onClose }) {
   function salvar() {
     if (!String(f.aluno).trim()) { alert("Informe o nome do aluno."); return; }
     onSave({
-      aluno: String(f.aluno).trim(),
+      aluno: String(f.aluno).trim(), nascimento: f.nascimento || null,
       responsavel: f.responsavel || null, telefone: f.telefone || null, email: f.email || null, turma: f.turma || null,
       plano: f.plano || null, mensalidade: numOuNull(f.mensalidade), desconto: numOuNull(f.desconto),
       valor_pago: numOuNull(f.valor_pago), em_aberto: numOuNull(f.em_aberto),
@@ -182,6 +183,7 @@ function ModalAluno({ aluno, onSave, onClose }) {
         </div>
         <div style={{ padding: "8px 22px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, overflowY: "auto" }}>
           {campo("aluno", "Aluno", { full: true })}
+          {campo("nascimento", "Data de nascimento (dd/mm/aaaa)")}
           {campo("responsavel", "Responsável")}
           {campo("telefone", "Telefone")}
           {campo("email", "E-mail", { full: true })}
@@ -607,7 +609,10 @@ export default function Familias({ onVoltar, modoProfessor = false, onSair, nome
           {modoProfessor ? (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 8 }}>
               <span style={{ fontSize: 12, color: "#C7C8CA", fontFamily: font }}>{nomeUsuario}</span>
-              <button onClick={onSair} style={{ background: VERDE, color: PRETO, border: "none", borderRadius: 4, padding: "6px 14px", fontSize: 12, fontWeight: 800, fontFamily: font, cursor: "pointer" }}>SAIR</button>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <SinoNotificacoes tema="escuro" />
+                <button onClick={onSair} style={{ background: VERDE, color: PRETO, border: "none", borderRadius: 4, padding: "6px 14px", fontSize: 12, fontWeight: 800, fontFamily: font, cursor: "pointer" }}>SAIR</button>
+              </div>
             </div>
           ) : (
             <button onClick={onVoltar} style={{ background: "none", border: "none", color: "#aaa", fontSize: 12, cursor: "pointer", fontFamily: font, padding: 0, marginBottom: 6, display: "block" }}>← Voltar ao Dashboard</button>
