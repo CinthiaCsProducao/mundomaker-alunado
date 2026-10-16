@@ -1,15 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "./supabaseClient";
+import { urlAssinada } from "./storageSeguro";
 
 const BUCKET = "romaneios";
 const font = "'Archivo', 'Segoe UI', sans-serif";
 
-function urlPublica(path) {
-  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
-}
-
 async function baixar(path, nomeArquivo) {
-  const res = await fetch(urlPublica(path));
+  const link = await urlAssinada(BUCKET, path);
+  if (!link) throw new Error("Sem permissão ou arquivo não encontrado");
+  const res = await fetch(link);
   if (!res.ok) throw new Error("Arquivo não encontrado");
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -34,6 +33,13 @@ export default function HistoricoRomaneios({ onVoltar }) {
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [visualizando, setVisualizando] = useState(null);
+  const [srcVis, setSrcVis] = useState("");
+  useEffect(() => {
+    let vivo = true;
+    setSrcVis("");
+    if (visualizando) urlAssinada(BUCKET, visualizando.pdf_path).then(u => { if (vivo) setSrcVis(u || ""); });
+    return () => { vivo = false; };
+  }, [visualizando]);
   const [baixando, setBaixando] = useState("");
   const [cicloSel, setCicloSel] = useState("__aberto__");
 
@@ -179,7 +185,7 @@ export default function HistoricoRomaneios({ onVoltar }) {
           </div>
           <iframe
             title="Romaneio"
-            src={urlPublica(visualizando.pdf_path)}
+            src={srcVis}
             style={{ flex: 1, width: "100%", border: "none", background: "#fff", borderRadius: "0 0 8px 8px" }}
           />
         </div>

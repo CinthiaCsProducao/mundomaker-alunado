@@ -117,18 +117,17 @@ function Header({ subTitle }) {
 }
 
 // ─── Tela de autenticação CNPJ ───────────────────────────────
-function TelaAuth({ escolaBase, envioNum, onAutenticado }) {
+function TelaAuth({ escolaBase, envioNum, onVerificar }) {
   const [digits, setDigits] = useState("");
   const [erro, setErro] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function verificar() {
-    if (!escolaBase?.cnpj) { setErro("CNPJ não cadastrado para esta escola."); return; }
-    const ultimos4 = escolaBase.cnpj.replace(/\D/g, "").slice(-4);
-    if (digits.trim() === ultimos4) {
-      onAutenticado();
-    } else {
-      setErro("CNPJ incorreto. Verifique os últimos 4 dígitos.");
-    }
+  async function verificar() {
+    if (digits.length !== 14 || busy) return;
+    setBusy(true); setErro("");
+    const msg = await onVerificar(digits);
+    if (msg) setErro(msg);
+    setBusy(false);
   }
 
   const envioLabel = envioNum === 1 ? "1º Envio" : envioNum === 2 ? "2º Envio" : "3º Envio";
@@ -149,21 +148,21 @@ function TelaAuth({ escolaBase, envioNum, onAutenticado }) {
               </div>
             </div>
             <div style={S.field}>
-              <label style={S.label}>Digite os 4 últimos dígitos do CNPJ</label>
+              <label style={S.label}>Digite o CNPJ da escola (14 números)</label>
               <input
-                style={{ ...S.input, fontSize:24, textAlign:"center", letterSpacing:8, fontWeight:800 }}
-                maxLength={4}
+                style={{ ...S.input, fontSize:20, textAlign:"center", letterSpacing:2, fontWeight:800 }}
+                maxLength={14} inputMode="numeric"
                 value={digits}
-                onChange={e => { setDigits(e.target.value.replace(/\D/g,"")); setErro(""); }}
+                onChange={e => { setDigits(e.target.value.replace(/\D/g,"").slice(0,14)); setErro(""); }}
                 onKeyDown={e => e.key === "Enter" && verificar()}
-                placeholder="_ _ _ _"
+                placeholder="00000000000000"
                 autoFocus
               />
             </div>
             {erro && <div style={{ ...S.error, marginTop:12 }}>⚠ {erro}</div>}
-            <button onClick={verificar} disabled={digits.length !== 4}
-              style={{ ...S.btnSubmit, marginTop:20, opacity: digits.length !== 4 ? 0.5 : 1 }}>
-              ACESSAR FORMULÁRIO
+            <button onClick={verificar} disabled={digits.length !== 14 || busy}
+              style={{ ...S.btnSubmit, marginTop:20, opacity: (digits.length !== 14 || busy) ? 0.5 : 1 }}>
+              {busy ? "VERIFICANDO..." : "ACESSAR FORMULÁRIO"}
             </button>
           </div>
         </div>
@@ -183,6 +182,9 @@ export default function AlunadoForm() {
   // Estado autenticação
   const [autenticado, setAutenticado] = useState(!modoLink);
   const [escolaBase, setEscolaBase] = useState(null);
+  const [cnpjInformado, setCnpjInformado] = useState("");
+  const [dadosServidor, setDadosServidor] = useState(null);
+  const [consentimento, setConsentimento] = useState(false);
   const [carregandoEscola, setCarregandoEscola] = useState(modoLink);
 
   // Estado formulário
@@ -213,8 +215,8 @@ export default function AlunadoForm() {
     if (!escolaId) return;
     async function carregar() {
       setCarregandoEscola(true);
-      const { data } = await supabase.from("base_escolas").select("*").eq("id", escolaId).single();
-      if (data) setEscolaBase(data.data);
+      const { data } = await supabase.rpc("get_escola_publica", { p_id: escolaId });
+      if (data) setEscolaBase(data);
       setCarregandoEscola(false);
     }
     carregar();
@@ -238,28 +240,16 @@ export default function AlunadoForm() {
       telefone: escolaBase.telefone || "",
     }));
 
-    // Carrega projetos para esta escola e envio
-    const { data: projetos } = await supabase.from("projetos_escola")
-      .select("*").eq("escola_id", escolaId).order("serie");
+    // Projetos e turmas já cadastradas (vindos do servidor após validar o CNPJ)
+    const projetos = dadosServidor?.projetos || [];
+    const gcMap = {};
+    (dadosServidor?.turmas || []).forEach(t => {
+      (gcMap[t.serie] = gcMap[t.serie] || []).push({
+        turma: t.turma, num_alunos: t.num_alunos?.toString() || "", professor_maker: t.professor_maker || "",
+      });
+    });
 
-    // Carrega turmas já cadastradas desta escola
-    const { data: schoolRows } = await supabase.from("schools")
-      .select("id").eq("escola_base_id", escolaId).limit(1);
-    let gcMap = {};
-    if (schoolRows && schoolRows.length > 0) {
-      const sid = schoolRows[0].id;
-      const { data: allGC } = await supabase.from("grade_classes").select("id,serie").eq("school_id", sid);
-      const { data: allCL } = await supabase.from("classes").select("*").eq("school_id", sid).order("turma");
-      if (allGC) {
-        allGC.forEach(gc => {
-          gcMap[gc.serie] = (allCL || []).filter(t => t.grade_class_id === gc.id).map(t => ({
-            turma: t.turma, num_alunos: t.num_alunos?.toString() || "", professor_maker: t.professor_maker || "",
-          }));
-        });
-      }
-    }
-
-    if (projetos && projetos.length > 0) {
+    if (projetos.length > 0) {
       const novasSeries = projetos.map(p => {
         const proj = envioNum === 1 ? p.envio_1 : envioNum === 2 ? p.envio_2 : p.envio_3;
         const turmasExist = gcMap[p.serie];
@@ -273,7 +263,7 @@ export default function AlunadoForm() {
       }).filter(s => s.projeto || Object.keys(gcMap).length === 0 || gcMap[s.serie]);
       setSeries(novasSeries.length > 0 ? novasSeries : []);
     }
-  }, [escolaBase, escolaId, envioNum]);
+  }, [escolaBase, dadosServidor, envioNum]);
 
   useEffect(() => {
     if (autenticado && modoLink && escolaBase) {
@@ -345,6 +335,7 @@ export default function AlunadoForm() {
     }
     if (!responsavel.trim()) return "Informe o responsável pelo preenchimento.";
     if (!assinaturaFeita) return "A assinatura digital é obrigatória.";
+    if (!consentimento) return "Confirme a ciência do Aviso de Privacidade.";
     return null;
   }
 
@@ -354,83 +345,36 @@ export default function AlunadoForm() {
     const err = validar(); if (err) { setErro(err); return; }
     setLoading(true);
     try {
-      const enderecoCompleto = [dadosGerais.logradouro,dadosGerais.numero,dadosGerais.complemento,dadosGerais.bairro,dadosGerais.cidade,dadosGerais.estado,dadosGerais.cep].filter(Boolean).join(", ");
-      const escolaPayload = {
-        endereco: enderecoCompleto,
-        telefone: dadosGerais.telefone,
-        responsavel_escola: dadosGerais.responsavel,
-        data_inicio: dadosGerais.data_inicio || null,
-        data_recebimento: dadosGerais.data_recebimento || null,
-        tipo_frete: dadosGerais.tipo_frete,
-        programa: dadosGerais.programa,
-        idioma_material: dadosGerais.idioma_material,
-        num_salas_maker: parseInt(dadosGerais.num_salas_maker) || 0,
-        ...(escolaId ? { escola_base_id: escolaId } : {}),
-      };
-
-      // Upsert escola
-      const { data: existentes } = await supabase.from("schools")
-        .select("id").ilike("nome", dadosGerais.nome.trim());
-      let sid;
-      if (existentes && existentes.length > 0) {
-        sid = existentes[0].id;
-        const { error: e1 } = await supabase.from("schools").update(escolaPayload).eq("id", sid);
-        if (e1) throw e1;
-        const { data: oldGC } = await supabase.from("grade_classes").select("id").eq("school_id", sid);
-        if (oldGC && oldGC.length > 0) {
-          await supabase.from("classes").delete().in("grade_class_id", oldGC.map(g => g.id));
-          await supabase.from("grade_classes").delete().eq("school_id", sid);
-        }
-      } else {
-        const { data: nova, error: e1 } = await supabase.from("schools")
-          .insert([{ nome: dadosGerais.nome, ...escolaPayload }]).select().single();
-        if (e1) throw e1;
-        sid = nova.id;
-      }
-
-      for (let i=0; i<series.length; i++) {
-        const s = series[i];
-        const { data: gc, error: e2 } = await supabase.from("grade_classes")
-          .insert([{ school_id:sid, serie:s.serie, ordem:i, projeto:s.projeto||null }]).select().single();
-        if (e2) throw e2;
-        for (const t of s.turmas) {
-          const { error: e3 } = await supabase.from("classes").insert([{
-            grade_class_id:gc.id, school_id:sid, turma:t.turma,
-            num_alunos:parseInt(t.num_alunos)||0, professor_maker:t.professor_maker||null }]);
-          if (e3) throw e3;
-        }
-      }
-
-      let calUrlPublic=null, calNome=null;
+      let calPath=null, calNome=null;
       if (calendario) {
-        const ext=calendario.name.split(".").pop();
-        const nomeCal=`${sid}_calendario.${ext}`;
-        const { error: e4 } = await supabase.storage.from("calendars").upload(nomeCal, calendario, { upsert: true });
+        const ext = calendario.type==="application/pdf" ? "pdf" : calendario.type==="image/png" ? "png" : "jpg";
+        calPath = `${crypto.randomUUID()}.${ext}`;
+        const { error: e4 } = await supabase.storage.from("calendars").upload(calPath, calendario, { upsert: false, contentType: calendario.type });
         if (e4) throw e4;
-        const { data: calUrl } = supabase.storage.from("calendars").getPublicUrl(nomeCal);
-        calUrlPublic=calUrl.publicUrl; calNome=calendario.name;
+        calNome = calendario.name;
       }
 
       const canvas=canvasRef.current;
       const sigBlob=await new Promise(res => canvas.toBlob(res,"image/png"));
-      const nomeSig=`${sid}_assinatura.png`;
-      const { error: e5 } = await supabase.storage.from("signatures").upload(nomeSig, sigBlob, { upsert: true });
+      const sigPath = `${crypto.randomUUID()}.png`;
+      const { error: e5 } = await supabase.storage.from("signatures").upload(sigPath, sigBlob, { upsert: false, contentType: "image/png" });
       if (e5) throw e5;
-      const { data: sigUrl } = supabase.storage.from("signatures").getPublicUrl(nomeSig);
 
-      const { error: e6 } = await supabase.from("alunado_history").insert([{
-        school_id:sid, total_alunos:totalAlunos, cluster,
-        responsavel_preenchimento:responsavel,
-        assinatura_url:sigUrl.publicUrl,
-        calendario_url:calUrlPublic, calendario_nome:calNome,
-        dados_snapshot:{ dadosGerais, series, totalAlunos, cluster },
-      }]);
+      const { data: res, error: e6 } = await supabase.rpc("enviar_alunado", {
+        p_id: escolaId, p_cnpj: cnpjInformado,
+        p_dados: { dadosGerais, series, responsavel, consentimento: true,
+          assinatura_path: sigPath, calendario_path: calPath, calendario_nome: calNome },
+      });
       if (e6) throw e6;
+      if (!res?.ok) {
+        const m = { bloqueado:"Muitas tentativas. Aguarde alguns minutos.", incorreto:"CNPJ não confere.", sem_consentimento:"É necessário confirmar a ciência do aviso de privacidade." };
+        throw new Error(m[res?.motivo] || "Não foi possível enviar (" + (res?.motivo || "erro") + ").");
+      }
 
       setCalendarioNome(calNome);
       setSucesso(true);
     } catch(err) {
-      console.error(err); setErro("Erro ao enviar: " + (err.message || JSON.stringify(err)));
+      console.error(err); setErro("Erro ao enviar: " + (err.message || "tente novamente."));
     } finally { setLoading(false); }
   }
 
@@ -445,8 +389,34 @@ export default function AlunadoForm() {
   }
 
   // ── Tela autenticação ──────────────────────────────────────
-  if (modoLink && !autenticado) {
-    return <TelaAuth escolaBase={escolaBase} envioNum={envioNum} onAutenticado={() => setAutenticado(true)} />;
+  if (!modoLink) {
+    return (
+      <div style={S.page}>
+        <Header />
+        <div style={{ maxWidth:480, margin:"60px auto", background:"#fff", borderRadius:8, padding:32, textAlign:"center", fontSize:14, color:"#444" }}>
+          Para preencher o formulário, use o link exclusivo enviado pela Mundo Maker para a sua escola.
+        </div>
+      </div>
+    );
+  }
+  if (!escolaBase) {
+    return (
+      <div style={S.page}>
+        <Header />
+        <div style={{ maxWidth:480, margin:"60px auto", background:"#fff", borderRadius:8, padding:32, textAlign:"center", fontSize:14, color:"#444" }}>
+          Link inválido ou escola não encontrada. Solicite um novo link à Mundo Maker.
+        </div>
+      </div>
+    );
+  }
+  if (!autenticado) {
+    return <TelaAuth escolaBase={escolaBase} envioNum={envioNum} onVerificar={async (cnpj) => {
+      const { data, error } = await supabase.rpc("get_escola_form", { p_id: escolaId, p_cnpj: cnpj });
+      if (error) return "Erro ao verificar. Tente novamente.";
+      if (!data?.ok) return data?.motivo === "bloqueado" ? "Muitas tentativas incorretas. Aguarde 15 minutos." : "CNPJ não confere.";
+      setCnpjInformado(cnpj); setDadosServidor(data); setEscolaBase(data.escola); setAutenticado(true);
+      return null;
+    }} />;
   }
 
   // ── Sucesso ────────────────────────────────────────────────
@@ -686,6 +656,13 @@ export default function AlunadoForm() {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div style={{ background:"#fff", border:"1.5px solid #e0e0e0", borderRadius:6, padding:"16px 20px", marginBottom:16, fontSize:13, color:"#333" }}>
+            <label style={{ display:"flex", gap:10, alignItems:"flex-start", cursor:"pointer" }}>
+              <input type="checkbox" checked={consentimento} onChange={e => setConsentimento(e.target.checked)} style={{ marginTop:3 }}/>
+              <span>Li e estou ciente do <a href="/privacidade" target="_blank" rel="noreferrer" style={{ color:"#148A00", fontWeight:700 }}>Aviso de Privacidade</a>. Declaro que os dados informados são da escola e que não estou enviando dados pessoais de alunos além do número de turmas e alunos. *</span>
+            </label>
           </div>
 
           <button type="submit" style={{ ...S.btnSubmit, opacity: loading ? 0.7 : 1 }} disabled={loading}>

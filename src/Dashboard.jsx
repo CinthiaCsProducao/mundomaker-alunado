@@ -8,8 +8,10 @@ import HistoricoRomaneios from "./HistoricoRomaneios";
 import PopsDocumentos from "./PopsDocumentos";
 import Familias from "./Familias";
 import CursoMaker from "./CursoMaker";
+import LgpdAdmin from "./LgpdAdmin";
 import SinoNotificacoes from "./Notificacoes";
 import { supabase } from "./supabaseClient";
+import { urlAssinada, auditar } from "./storageSeguro";
 
 // Detecta (antes do Supabase limpar a URL) se a pessoa chegou por um link enviado por e-mail
 const VEIO_DE_LINK = typeof window !== "undefined" &&
@@ -73,7 +75,22 @@ function LogoMM({ size = 56, cor = "#111" }) {
   );
 }
 
-function gerarPDF(escola, detalhes, hist) {
+async function assinarHist(h) {
+  if (!h) return h;
+  const [assinatura_url, calendario_url] = await Promise.all([
+    urlAssinada("signatures", h.assinatura_url, 3600), urlAssinada("calendars", h.calendario_url, 3600),
+  ]);
+  return { ...h, assinatura_url, calendario_url };
+}
+
+// Abre a janela no clique (evita bloqueio de pop-up) e monta o PDF após obter links temporários
+async function gerarPDF(escola, detalhes, hist) {
+  const win = window.open("", "_blank");
+  const h = await assinarHist(hist);
+  gerarPDFBase(escola, detalhes, h, win);
+}
+
+function gerarPDFBase(escola, detalhes, hist, win) {
   const seriesHtml = detalhes
     ? detalhes.series.map(s => {
         const turmas = detalhes.turmas.filter(t => t.grade_class_id === s.id);
@@ -99,7 +116,6 @@ function gerarPDF(escola, detalhes, hist) {
     escola.cep,
   ].filter(Boolean).join(" · ") || escola.endereco || "—";
 
-  const win = window.open("", "_blank");
   win.document.write(`
     <!DOCTYPE html><html><head>
     <meta charset="UTF-8">
@@ -400,7 +416,7 @@ function ModalEscolaHistorico({ escola, onClose }) {
         supabase.from("grade_classes").select("id, serie, ordem").eq("school_id", escola.id).order("ordem"),
         supabase.from("classes").select("grade_class_id, turma, num_alunos, professor_maker").eq("school_id", escola.id),
       ]);
-      const items = (histories || []).map(h => ({ ...h, series: gc || [], turmas: cl || [] }));
+      const items = await Promise.all((histories || []).map(async h => ({ ...(await assinarHist(h)), series: gc || [], turmas: cl || [] })));
       setEnvios(items);
       setLoading(false);
     }
@@ -1309,7 +1325,7 @@ function ModalDetalhes({ escola, onClose, onDelete, isAdmin }) {
           .order("data_submissao", { ascending: false }).limit(1).single(),
       ]);
       setDetalhes({ series: gc || [], turmas: cl || [] });
-      setHist(h || null);
+      setHist(h ? await assinarHist(h) : null);
     }
     buscar();
   }, [escola]);
@@ -1767,20 +1783,27 @@ export default function Dashboard() {
         await supabase.auth.signOut();
         setErroLogin("Este e-mail não tem acesso ativo ao sistema.");
       }
-      const saved = localStorage.getItem("mm_dashboard_equipe");
-      if (saved) {
-        try {
-          const equipe = JSON.parse(saved);
-          setLogado(true);
-          setEquipeLogada(equipe);
-          carregarDados();
-        } catch (e) {
-          localStorage.removeItem("mm_dashboard_equipe");
-        }
-      }
+      localStorage.removeItem("mm_dashboard_equipe");   // sessão antiga (sem Supabase Auth) não é mais aceita
     }
     iniciar();
   }, []); // eslint-disable-line
+
+  // Encerra a sessão após 30 minutos sem atividade (LGPD art. 46 — segurança)
+  useEffect(() => {
+    if (!logado) return;
+    let t;
+    const reiniciar = () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        alert("Sessão encerrada por inatividade. Entre novamente.");
+        handleLogout();
+      }, 30 * 60 * 1000);
+    };
+    const eventos = ["mousemove", "keydown", "click", "touchstart", "scroll"];
+    eventos.forEach(ev => window.addEventListener(ev, reiniciar, { passive: true }));
+    reiniciar();
+    return () => { clearTimeout(t); eventos.forEach(ev => window.removeEventListener(ev, reiniciar)); };
+  }, [logado]); // eslint-disable-line
 
   async function enviarLinkSenha(e) {
     e.preventDefault();
@@ -1815,7 +1838,7 @@ export default function Dashboard() {
     e.preventDefault();
     setErroLogin(""); setMsgLogin("");
     const emailN = email.trim().toLowerCase();
-    // 1) Login novo (Supabase Auth)
+    // Login (Supabase Auth)
     const { data: au } = await supabase.auth.signInWithPassword({ email: emailN, password: senha });
     if (au?.session) {
       const ok = await entrarComSessao(emailN);
@@ -1824,29 +1847,7 @@ export default function Dashboard() {
       setErroLogin("Este e-mail não tem acesso ativo ao sistema.");
       return;
     }
-    // 2) Login antigo (durante a transição)
-    try {
-      const enc  = new TextEncoder();
-      const buf  = await crypto.subtle.digest("SHA-256", enc.encode(senha));
-      const hash = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-      const { data: usuario } = await supabase
-        .from("usuarios").select("*")
-        .eq("email", email.trim().toLowerCase())
-        .eq("senha", hash)
-        .eq("ativo", true)
-        .single();
-      if (usuario) {
-        const acesso = { equipe: usuario.nome, cor: "#39DF18", permissoes: usuario.permissoes || {}, email: usuario.email };
-        if (manterLogado) localStorage.setItem("mm_dashboard_equipe", JSON.stringify(acesso));
-        setLogado(true);
-        setEquipeLogada(acesso);
-        carregarDados();
-      } else {
-        setErroLogin("E-mail ou senha incorretos.");
-      }
-    } catch {
-      setErroLogin("E-mail ou senha incorretos.");
-    }
+    setErroLogin("E-mail ou senha incorretos.");
   }
 
   async function carregarDados() {
@@ -2005,6 +2006,7 @@ export default function Dashboard() {
 
   async function handleDelete(schoolId) {
     await supabase.from("schools").delete().eq("id", schoolId);
+    auditar("excluir_escola", "schools", schoolId);
     setEscolaSelecionada(null);
     carregarDados();
   }
@@ -2112,6 +2114,9 @@ export default function Dashboard() {
                 Primeiro acesso / Esqueci minha senha
               </button>
             </div>
+            <div style={{ textAlign: "center", marginTop: 10 }}>
+              <a href="/privacidade" target="_blank" rel="noreferrer" style={{ color: "#aaa", fontSize: 12, fontFamily: font }}>Aviso de Privacidade</a>
+            </div>
           </form>
         )}
 
@@ -2183,6 +2188,7 @@ export default function Dashboard() {
     ] },
     { grupo: "Administração", itens: [
       { id: "usuarios", label: "Usuários", show: isAdmin },
+      { id: "lgpd", label: "LGPD e auditoria", show: isAdmin },
     ] },
   ].map(g => ({ ...g, itens: g.itens.filter(i => i.show) })).filter(g => g.itens.length > 0);
   const itemAtual = itensMenu.flatMap(g => g.itens).find(i => i.id === view);
@@ -2304,6 +2310,10 @@ export default function Dashboard() {
 
       {view === "usuarios" && (
         <GerenciarUsuarios onVoltar={() => setView("dashboard")} />
+      )}
+
+      {view === "lgpd" && isAdmin && (
+        <LgpdAdmin onVoltar={() => setView("dashboard")} />
       )}
 
       {view === "projecao" && (

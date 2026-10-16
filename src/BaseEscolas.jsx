@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "./supabaseClient";
 import { mapTipo } from "./programaTipo";
+import { useAssinados, auditar } from "./storageSeguro";
 
 const font = "'Figtree','Circular Std','Segoe UI',system-ui,sans-serif";
 const fontB = "'Barlow','DIN Round Pro','Segoe UI',system-ui,sans-serif";
@@ -697,11 +698,12 @@ function HistoricoTab({ escola, supabaseClient, autor, onSave }) {
   const midiaRef = useRef();
   const docRef   = useRef();
 
-  const posts = [...(escola.observacoes || [])].sort((a, b) => {
+  const postsBrutos = [...(escola.observacoes || [])].sort((a, b) => {
     const da = a.criado_em || a.data || "";
     const db = b.criado_em || b.data || "";
     return db.localeCompare(da);
   });
+  const posts = useAssinados(postsBrutos);
 
   function addMidia(e) {
     Array.from(e.target.files).forEach(file => {
@@ -971,11 +973,12 @@ function RubricasTab({ escola, supabaseClient, autor, onSave }) {
   const midiaRef = useRef();
   const docRef   = useRef();
 
-  const posts = [...(escola.rubricas || [])].sort((a, b) => {
+  const postsBrutos = [...(escola.rubricas || [])].sort((a, b) => {
     const da = a.criado_em || a.dataObs || "";
     const db = b.criado_em || b.dataObs || "";
     return db.localeCompare(da);
   });
+  const posts = useAssinados(postsBrutos);
 
   function addMidia(e) {
     Array.from(e.target.files).forEach(file => {
@@ -1814,6 +1817,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
   async function excluir(escola) {
     await supabase.from("projetos_escola").delete().eq("escola_id", escola.id);
     await supabase.from("base_escolas").delete().eq("id", escola.id);
+    auditar("excluir_escola", "base_escolas", escola.id);
     setEscolas(prev=>prev.filter(e=>e.id!==escola.id));
     if (sel?.id===escola.id) setSel(null);
     setConfirm(null);

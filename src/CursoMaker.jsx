@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 import SinoNotificacoes from "./Notificacoes";
+import { auditar, mascararCPF } from "./storageSeguro";
 
 const font  = "'Figtree','Circular Std','Segoe UI',system-ui,sans-serif";
 const fontB = "'Barlow','DIN Round Pro','Segoe UI',system-ui,sans-serif";
@@ -27,6 +28,7 @@ const diaDaData = (iso) => NOME_DIA_JS[new Date(iso + "T12:00:00").getDay()];
 const somaDias = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 
 function baixarCSV(nome, linhas) {
+  auditar("exportar_csv", "arquivo", nome, { linhas: linhas.length - 1 });
   const csv = "﻿" + linhas.map(r => r.map(c => `"${String(c ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
   const a = document.createElement("a");
@@ -111,6 +113,7 @@ function ModalAluno({ aluno, turmas, onSave, onClose }) {
     conta_azul: "", observacoes: "", status: "Ativo", ...Object.fromEntries(Object.entries(aluno).map(([k, v]) => [k, v ?? ""])),
   });
   const [salvando, setSalvando] = useState(false);
+  const [cpfVisivel, setCpfVisivel] = useState(!aluno.id || !aluno.cpf);
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
   const turmaSel = turmas.find(tu => tu.id === f.turma_id) || null;
   const turmasOrd = [...turmas].sort((x, y) => idxDia(x.dia) - idxDia(y.dia) || (x.horario || "").localeCompare(y.horario || "", "pt-BR", { numeric: true }) || (x.nome || "").localeCompare(y.nome || "", "pt-BR"));
@@ -154,7 +157,15 @@ function ModalAluno({ aluno, turmas, onSave, onClose }) {
           {campo("nascimento", "Data de nascimento")}
           {campo("escola_estuda", "Escola em que estuda")}
           {campo("responsavel", "Responsável")}
-          {campo("cpf", "CPF do responsável")}
+          {cpfVisivel ? campo("cpf", "CPF do responsável") : (
+            <label style={lbl}>CPF do responsável
+              <div style={{ display: "flex", gap: 6 }}>
+                <input value={mascararCPF(f.cpf)} readOnly style={{ ...inp, background: "#F1F2F2" }} />
+                <button type="button" onClick={() => { auditar("ver_cpf", "cm_alunos", aluno.id); setCpfVisivel(true); }}
+                  style={{ border: "1px solid #DCDDDE", background: "#fff", borderRadius: 4, padding: "0 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Mostrar</button>
+              </div>
+            </label>
+          )}
           {campo("telefone", "Telefone")}
           {campo("email", "E-mail", { full: true })}
           {campo("endereco", "Endereço", { full: true })}
@@ -228,11 +239,12 @@ function AbaAlunos({ alunos, turmas, pagamentos, recarregar, podeExcluir }) {
     if (!window.confirm(`Remover "${a.nome}"? Isso apaga também a chamada e os pagamentos dele. Esta ação não pode ser desfeita.`)) return;
     const { error } = await supabase.from("cm_alunos").delete().eq("id", a.id);
     if (error) { alert("Erro ao remover: " + error.message); return; }
+    auditar("excluir_aluno", "cm_alunos", a.id);
     recarregar();
   }
   function exportar() {
     const linhas = [["Aluno","Tipo","Matrícula","Nascimento","Escola","Responsável","CPF","Telefone","E-mail","Plano","Turma","Dia","Horário","Professor","Valor","Faltando","Forma de pagamento","Status pgto","Contrato","Conta Azul","Situação","Observações"]];
-    lista.forEach(a => linhas.push([a.nome,a.tipo,a.matricula,a.nascimento,a.escola_estuda,a.responsavel,a.cpf,a.telefone,a.email,a.plano,a.turma_nome,a.dia,a.horario,profDe(a),a.valor,a.faltando,a.forma_pagamento,a.status_pgto,a.contrato,a.conta_azul,a.status,a.observacoes]));
+    lista.forEach(a => linhas.push([a.nome,a.tipo,a.matricula,a.nascimento,a.escola_estuda,a.responsavel,mascararCPF(a.cpf),a.telefone,a.email,a.plano,a.turma_nome,a.dia,a.horario,profDe(a),a.valor,a.faltando,a.forma_pagamento,a.status_pgto,a.contrato,a.conta_azul,a.status,a.observacoes]));
     baixarCSV("CursoMaker_alunos.csv", linhas);
   }
 
@@ -446,11 +458,6 @@ function AbaChamada({ alunos, turmas, modoProfessor }) {
 }
 
 // ── Aba: Turmas e professores ───────────────────────────────────
-async function hashSenha(senha) {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(senha));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
 function ModalTurma({ turma, professores, onSave, onClose }) {
   const [f, setF] = useState({ nome: turma.nome || "", dia: turma.dia || "", horario: turma.horario || "", professor_email: (turma.professor_email || "").toLowerCase() });
   const [salvando, setSalvando] = useState(false);
@@ -506,11 +513,7 @@ function ModalProfessor({ onFeito, onClose }) {
     const em = email.trim().toLowerCase();
     if (!nome.trim() || !em) { alert("Preencha o nome e o e-mail."); return; }
     setSalvando(true);
-    const rnd = Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2, "0")).join("");
-    const { error } = await supabase.from("usuarios").insert([{
-      email: em, nome: nome.trim(), ativo: true, senha: await hashSenha(rnd),
-      permissoes: { historico: false, escolas: false, inspiramaker: false, projecao: false, baseEscolas: false, familias: false, cursoMaker: false, cmProfessor: true, admin: false, popsAreas: [], chamadaEscolas: [] },
-    }]);
+    const { error } = await supabase.rpc("criar_usuario_professor", { p_email: em, p_nome: nome.trim() });
     if (error) {
       setSalvando(false);
       alert(/duplicate|unique|23505/i.test(error.message + (error.code || ""))

@@ -17,12 +17,6 @@ const PERMISSOES_LABELS = [
   { key: "admin",        label: "Admin (gerenciar usuários + encerrar ciclo)" },
 ];
 
-async function hashSenha(senha) {
-  const enc  = new TextEncoder();
-  const buf  = await crypto.subtle.digest("SHA-256", enc.encode(senha));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
-}
-
 // Envia ao usuário um e-mail com o link para criar a própria senha (a senha nunca é enviada por e-mail)
 async function enviarLinkAcesso(email) {
   const { error } = await supabase.auth.signInWithOtp({
@@ -88,13 +82,6 @@ function ModalUsuario({ usuario, onSave, onClose }) {
         permissoes: form.permissoes,
         ativo:      form.ativo,
       };
-      if (form.senha.trim()) payload.senha = await hashSenha(form.senha.trim());
-      // Novo usuário sem senha definida: guarda uma senha aleatória (ele cria a dele pelo link do e-mail)
-      if (isNovo && !payload.senha) {
-        const rnd = Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2, "0")).join("");
-        payload.senha = await hashSenha(rnd);
-      }
-
       if (isNovo) {
         const { error } = await supabase.from("usuarios").insert([payload]);
         if (error) throw error;
@@ -126,8 +113,7 @@ function ModalUsuario({ usuario, onSave, onClose }) {
         {[
           { label:"Nome",  key:"nome",  type:"text" },
           { label:"E-mail",key:"email", type:"email" },
-          { label: isNovo ? "Senha provisória (opcional: a pessoa cria a dela pelo e-mail)" : "Nova senha (deixe em branco para manter)", key:"senha", type:"password" },
-        ].map(f=>(
+          ].map(f=>(
           <div key={f.key} style={{ marginBottom:14 }}>
             <label style={{ fontSize:11,fontWeight:700,color:"#555",textTransform:"uppercase",letterSpacing:.8,display:"block",marginBottom:5 }}>{f.label}</label>
             <input type={f.type} value={form[f.key]} onChange={e=>set(f.key,e.target.value)}

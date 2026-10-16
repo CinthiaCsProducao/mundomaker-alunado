@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "./supabaseClient";
+import { auditar } from "./storageSeguro";
 import SinoNotificacoes from "./Notificacoes";
 
 const font  = "'Figtree','Circular Std','Segoe UI',system-ui,sans-serif";
@@ -39,6 +40,7 @@ const numOuNull = (v) => { if (v === "" || v === null || v === undefined) return
 const ordenaNome = (a, b) => (a.aluno || "").localeCompare(b.aluno || "", "pt-BR", { sensitivity: "base" });
 
 function baixarCSV(nome, linhas) {
+  auditar("exportar_csv", "arquivo", nome, { linhas: linhas.length - 1 });
   const csv = "﻿" + linhas.map(r => r.map(c => `"${String(c ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
   const a = document.createElement("a");
@@ -258,6 +260,7 @@ function AbaAlunos({ escola, alunos, recarregar }) {
   async function remover(a) {
     if (!window.confirm(`Remover "${a.aluno}"? Isso apaga também a chamada dele. Esta ação não pode ser desfeita.`)) return;
     await supabase.from("familias_alunos").delete().eq("id", a.id);
+    auditar("excluir_aluno", "familias_alunos", a.id);
     recarregar();
   }
   function exportar() {
@@ -566,6 +569,7 @@ export default function Familias({ onVoltar, modoProfessor = false, onSair, nome
     if (digitado.trim().toLowerCase() !== e.nome.trim().toLowerCase()) { alert("O nome não confere. Nada foi excluído."); return; }
     const { error } = await supabase.from("familias_escolas").delete().eq("id", e.id);
     if (error) { alert("Erro ao excluir: " + error.message); return; }
+    auditar("excluir_escola", "familias_escolas", e.id);
     setSelId(null);
     carregar();
   }
