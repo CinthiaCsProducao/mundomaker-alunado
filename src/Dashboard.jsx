@@ -1,5 +1,5 @@
 // v2.2 - esqueci senha + reunioes + romaneio
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import BaseEscolas from "./BaseEscolas";
 import GerenciarUsuarios from "./GerenciarUsuarios";
 import CortesDashboard from "./CortesDashboard";
@@ -692,15 +692,29 @@ function HistoricoCiclos({ ciclos, onVoltar }) {
   );
 }
 
+// Atualiza os dados sozinho: a cada 30 s (com a aba visível) e quando a pessoa volta para a janela
+function useAutoAtualizar(fn, ms = 30000) {
+  const ref = useRef(fn);
+  useEffect(() => { ref.current = fn; });
+  useEffect(() => {
+    const rodar = () => { if (document.visibilityState === "visible") ref.current(); };
+    const t = setInterval(rodar, ms);
+    document.addEventListener("visibilitychange", rodar);
+    window.addEventListener("focus", rodar);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", rodar); window.removeEventListener("focus", rodar); };
+  }, [ms]);
+}
+const horaAgora = () => new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
 function EscolasDashboard({ onVoltar }) {
   const [escolas, setEscolas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
   const [escolaSel, setEscolaSel] = useState(null);
+  const [atualizadoEm, setAtualizadoEm] = useState("");
 
-  useEffect(() => {
-    async function carregar() {
-      setLoading(true);
+  const carregar = useCallback(async (silencioso = false) => {
+      if (!silencioso) setLoading(true);
       const [{ data: schools }, { data: histories }, { data: allGC }, { data: allCL }] = await Promise.all([
         supabase.from("schools").select("*").order("nome"),
         supabase.from("alunado_history").select("school_id, total_alunos, cluster, data_submissao").order("data_submissao", { ascending: false }),
@@ -744,9 +758,10 @@ function EscolasDashboard({ onVoltar }) {
 
       setEscolas(resultado);
       setLoading(false);
-    }
-    carregar();
+      setAtualizadoEm(horaAgora());
   }, []);
+  useEffect(() => { carregar(false); }, [carregar]);
+  useAutoAtualizar(() => carregar(true), 30000);
 
   const filtradas = escolas.filter(e => (e.nome || "").toLowerCase().includes(busca.toLowerCase()));
   const totalGeral = escolas.reduce((a, e) => a + (e.total_alunos || 0), 0);
@@ -768,7 +783,10 @@ function EscolasDashboard({ onVoltar }) {
           Voltar ao Dashboard
         </button>
         <div style={{ fontSize: 26, fontWeight: 800, color: "#111" }}>Escolas</div>
-        <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>{escolas.length} escola{escolas.length !== 1 ? "s" : ""} cadastrada{escolas.length !== 1 ? "s" : ""} (todos os ciclos)</div>
+        <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>{escolas.length} escola{escolas.length !== 1 ? "s" : ""} cadastrada{escolas.length !== 1 ? "s" : ""} (todos os ciclos)
+          <span style={{ marginLeft: 12, color: "#999" }}>Atualiza sozinho · última: {atualizadoEm || "—"}</span>
+          <button onClick={() => carregar(true)} style={{ marginLeft: 10, background: "none", border: "1px solid #ccc", borderRadius: 4, padding: "2px 10px", fontSize: 12, cursor: "pointer", fontFamily: font }}>↻ Atualizar</button>
+        </div>
       </div>
 
       {loading ? (
@@ -865,6 +883,7 @@ function InspiramakerDashboard({ onVoltar }) {
   const [projetos, setProjetos] = useState({});
   const [editandoGc, setEditandoGc] = useState(null); // id da série em edição
   const [rascunho, setRascunho]     = useState("");
+  const [atualizadoEm, setAtualizadoEm] = useState("");
 
   function iniciarEdicao(gcId) {
     setEditandoGc(gcId);
@@ -904,9 +923,8 @@ function InspiramakerDashboard({ onVoltar }) {
     await supabase.from("grade_classes").update({ projeto: valor }).eq("id", gcId);
   }
 
-  useEffect(() => {
-    async function carregar() {
-      setLoading(true);
+  const carregar = useCallback(async (silencioso = false) => {
+      if (!silencioso) setLoading(true);
       const { data: schools } = await supabase.from("schools").select("*")
         .in("programa", ["MakerLab Oficina", "MakerLab Oficina Inventores do Futuro"]).order("nome");
 
@@ -951,9 +969,10 @@ function InspiramakerDashboard({ onVoltar }) {
 
       setDados(resultado);
       setLoading(false);
-    }
-    carregar();
+      setAtualizadoEm(horaAgora());
   }, []);
+  useEffect(() => { carregar(false); }, [carregar]);
+  useAutoAtualizar(() => carregar(true), 30000);
 
   const filtrados = dados.filter(e => (e.nome || "").toLowerCase().includes(busca.toLowerCase()));
   const maxTurmas = Math.max(1, ...filtrados.flatMap(e => e.series.map(s => s.turmas.length)));
@@ -1129,7 +1148,10 @@ function InspiramakerDashboard({ onVoltar }) {
           Voltar ao Dashboard
         </button>
         <div style={{ fontSize: 26, fontWeight: 800, color: "#111" }}>Inspiramaker</div>
-        <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>MakerLab Oficina — 1 caixa para cada grupo de 4 alunos (arredondado para cima)</div>
+        <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>MakerLab Oficina — 1 caixa para cada grupo de 4 alunos (arredondado para cima)
+          <span style={{ marginLeft: 12, color: "#999" }}>Atualiza sozinho · última: {atualizadoEm || "—"}</span>
+          <button onClick={() => carregar(true)} style={{ marginLeft: 10, background: "none", border: "1px solid #ccc", borderRadius: 4, padding: "2px 10px", fontSize: 12, cursor: "pointer", fontFamily: font }}>↻ Atualizar</button>
+        </div>
       </div>
 
       {loading ? (
