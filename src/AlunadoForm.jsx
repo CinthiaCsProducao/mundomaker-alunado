@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "./supabaseClient";
+import { mapTipo } from "./programaTipo";
 
 const TURMAS = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P"];
 const SERIES_OPCOES = [
@@ -14,18 +15,6 @@ function calcularCluster(total) {
   if (total >= 300) return "Gold";
   if (total >= 100) return "Silver";
   return "Bronze";
-}
-
-function mapTipo(tipo) {
-  if (!tipo) return "";
-  const t = tipo.toLowerCase();
-  if (t.includes("inventores") && t.includes("oficina")) return "MakerLab Oficina Inventores do Futuro";
-  if (t.includes("inventores")) return "Inventores do Futuro";
-  if (t.includes("oficina")) return "MakerLab Oficina";
-  if (t.includes("class")) return "MakerLab Class";
-  if (t.includes("techlab")) return "Inventores do Futuro";
-  if (t.includes("makerlab")) return "MakerLab Class";
-  return tipo;
 }
 
 const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");

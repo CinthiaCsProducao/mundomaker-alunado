@@ -1,6 +1,7 @@
 // v2.1 - aba reunioes
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "./supabaseClient";
+import { mapTipo } from "./programaTipo";
 
 const font = "'Figtree','Circular Std','Segoe UI',system-ui,sans-serif";
 const fontB = "'Barlow','DIN Round Pro','Segoe UI',system-ui,sans-serif";
@@ -1802,6 +1803,10 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
     if (!escola) return;
     const newData = { ...escola, ...patch, atualizadoEm: new Date().toISOString() };
     await supabase.from("base_escolas").upsert([{ id, data: newData }]);
+    // Mudou o Tipo da escola: atualiza o programa dela nas telas Escolas e Inspiramaker
+    if (patch.tipo !== undefined && patch.tipo !== escola.tipo) {
+      await supabase.from("schools").update({ programa: mapTipo(patch.tipo) || null }).eq("escola_base_id", id);
+    }
     setEscolas(prev => prev.map(e => e.id===id ? newData : e));
     if (sel?.id===id) setSel(newData);
   }
