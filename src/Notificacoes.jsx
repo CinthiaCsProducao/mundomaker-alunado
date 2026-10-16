@@ -85,7 +85,7 @@ export default function SinoNotificacoes({ tema = "claro" }) {
               {itens.length === 0 && <div style={{ padding: 24, textAlign: "center", color: "#888", fontSize: 13, fontFamily: fontB }}>Nenhuma notificação.</div>}
               {itens.map(i => {
                 const lida = lidas.has(i.id);
-                const cor = i.tipo === "falta" ? "#D81E27" : VERDE;
+                const cor = i.tipo === "falta" ? "#D81E27" : i.tipo === "formulario" ? "#0B6BCB" : VERDE;
                 return (
                   <div key={i.id} onClick={() => !lida && marcar([i.id])}
                     style={{ display: "flex", gap: 10, padding: "10px 16px", borderBottom: "1px solid #F1F2F2", background: lida ? "#fff" : "rgba(57,223,24,.08)", cursor: lida ? "default" : "pointer" }}>
