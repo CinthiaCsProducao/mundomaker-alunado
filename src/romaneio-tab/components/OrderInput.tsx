@@ -9,9 +9,19 @@ import { products as defaultProducts } from '../data/products';
 import { agruparProjetos, nomeBaseProjeto } from '../lib/projectGroups';
 import { generateManifest } from '../lib/packaging';
 import { BotaoTema } from './BotaoTema';
+import { parseSchoolYear } from '../lib/schoolYears';
+
+/** [MODIFICADO NO MUNDO MAKER] Pedido que chega pronto do Inspiramaker. */
+export type PedidoInicial = {
+  chave: string;               // muda a cada envio; é o que faz o pedido ser aplicado de novo
+  escola: string;
+  linha?: string;
+  itens: Array<{ serie: string; projeto: string; base: number; comp: number; prof: number }>;
+};
 
 interface OrderInputProps {
   onGenerate: (items: OrderItem[], schoolName: string, linha?: string) => void;
+  pedidoInicial?: PedidoInicial;
 }
 
 const SCHOOLS = [
@@ -337,11 +347,12 @@ const Linha = React.memo<LinhaProps>(({ projeto, series, qBase, qComp, qProf, on
 Linha.displayName = 'Linha';
 
 
-export const OrderInput: React.FC<OrderInputProps> = ({ onGenerate }) => {
+export const OrderInput: React.FC<OrderInputProps> = ({ onGenerate, pedidoInicial }) => {
   const [schoolName, setSchoolName] = useState('');
   const [linha, setLinha] = useState('Linha 3');
   const [sugestoes, setSugestoes] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [avisoPre, setAvisoPre] = useState<string | null>(null);
   const caixaEscola = useRef<HTMLDivElement>(null);
 
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -470,6 +481,52 @@ export const OrderInput: React.FC<OrderInputProps> = ({ onGenerate }) => {
     Object.values(saida).forEach(l => l.sort((a, b) => a.nome.localeCompare(b.nome)));
     return Object.entries(saida).sort(([a], [b]) => ordemSerie(a) - ordemSerie(b));
   }, [projetos, busca, serieFiltro]);
+
+  /**
+   * [MODIFICADO NO MUNDO MAKER] Pré-preenchimento vindo do Inspiramaker.
+   * Casa cada linha pelo nome do projeto (sem acento nem maiúscula) e pela série.
+   * O que não casa vai para o aviso; o resto o usuário edita como sempre.
+   */
+  const aplicadoRef = useRef<string>('');
+  useEffect(() => {
+    if (!pedidoInicial || aplicadoRef.current === pedidoInicial.chave) return;
+    aplicadoRef.current = pedidoInicial.chave;
+    const norm = (t: string) => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+    const chaveSerie = (t: string) => { try { return parseSchoolYear(t).key; } catch { return norm(t); } };
+    const q: Record<string, number> = {};
+    const t: Record<string, number> = {};
+    const cy: Record<string, string> = {};
+    const faltou: string[] = [];
+
+    pedidoInicial.itens.forEach(it => {
+      if (!(it.base > 0 || it.comp > 0 || it.prof > 0)) return;
+      const nomeAlvo = norm(it.projeto);
+      if (!nomeAlvo) { faltou.push(`${it.serie}: sem projeto definido`); return; }
+      const alvoSerie = chaveSerie(it.serie);
+      const porNome = projetos.filter(p => norm(p.nome) === nomeAlvo || norm(p.nome).includes(nomeAlvo) || nomeAlvo.includes(norm(p.nome)));
+      const exato = porNome.filter(p => norm(p.nome) === nomeAlvo);
+      const lista = exato.length > 0 ? exato : porNome;
+      const proj = lista.find(p => chaveSerie(p.serie) === alvoSerie) || lista[0];
+      if (!proj || !(proj.base || proj.comp)) { faltou.push(`${it.projeto} (${it.serie})`); return; }
+      const idBase = proj.base?.caixas[0].id;
+      const idComp = proj.comp?.caixas[0].id;
+      if (idBase && it.base > 0) q[idBase] = (q[idBase] || 0) + it.base;
+      if (idComp && it.comp > 0) q[idComp] = (q[idComp] || 0) + it.comp;
+      if (idBase && it.prof > 0) t[idBase] = (t[idBase] || 0) + it.prof;
+      if (chaveSerie(proj.serie) !== alvoSerie) {
+        const destino = nomesSeries.find(n => chaveSerie(n) === alvoSerie);
+        if (destino) [idBase, idComp].forEach(id => { if (id) cy[id] = destino; });
+      }
+    });
+
+    setSchoolName(pedidoInicial.escola);
+    if (pedidoInicial.linha) setLinha(pedidoInicial.linha);
+    setQuantities(q); setTeacherQuantities(t); setCustomYears(cy);
+    setError(null);
+    setAvisoPre(faltou.length > 0
+      ? `Pré-preenchido do Inspiramaker. Não achei no catálogo: ${faltou.join('; ')}. Marque esses à mão.`
+      : 'Pré-preenchido do Inspiramaker. Confira e ajuste se precisar.');
+  }, [pedidoInicial, projetos, nomesSeries]);
 
   /* Um professor entra sozinho quando o projeto passa de uma caixa de aluno. */
   const anteriores = useRef<Record<string, number>>({});
@@ -828,6 +885,12 @@ export const OrderInput: React.FC<OrderInputProps> = ({ onGenerate }) => {
               style={{ height: 32, padding: '0 12px', background: 'transparent', border: '1px solid var(--color-c-line)', color: 'var(--color-c-faint)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-app)', flexShrink: 0 }}>Limpar</button>
           )}
         </header>
+
+        {avisoPre && !error && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 18px', borderBottom: '1px solid var(--color-c-line)', color: 'var(--color-brand-green-deep)', fontSize: 13 }}>
+            {avisoPre}
+          </div>
+        )}
 
         {error && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 18px', background: 'var(--color-danger-deep)', borderBottom: '1px solid #5C1F22', color: '#FFB3B6', fontSize: 13 }}>

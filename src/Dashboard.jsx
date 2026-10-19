@@ -892,7 +892,7 @@ function EscolasDashboard({ onVoltar }) {
 }
 
 // ─── Base Escolas Dashboard ──────────────────────────────────
-function InspiramakerDashboard({ onVoltar }) {
+function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
   const [dados, setDados]       = useState([]);
   const [loading, setLoading]   = useState(true);
   const [busca, setBusca]       = useState("");
@@ -1239,7 +1239,26 @@ function InspiramakerDashboard({ onVoltar }) {
                       return (
                         <tr key={`${escola.id}-${s.serie}`} style={{ borderTop: primeiro ? "2px solid #ddd" : "1px solid #f0f0f0", background: si % 2 === 0 ? "#fff" : "#fafafa" }}>
                           <td style={{ padding: "8px 14px", color: "#555", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{primeiro ? escola.idioma : ""}</td>
-                          <td style={{ padding: "8px 14px", fontWeight: primeiro ? 700 : 400, color: "#111", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{primeiro ? escola.nome : ""}</td>
+                          <td style={{ padding: "8px 14px", fontWeight: primeiro ? 700 : 400, color: "#111", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>
+                            {primeiro ? escola.nome : ""}
+                            {primeiro && onGerarRomaneio && (
+                              <button onClick={() => onGerarRomaneio({
+                                chave: `${escola.id}-${Date.now()}`,
+                                escola: escola.nome,
+                                itens: escola.series.map(sr => ({
+                                  serie: sr.serie,
+                                  projeto: projetos[sr.gcId] || "",
+                                  base: sr.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0),
+                                  comp: Number(calcularComplementar(projetos[sr.gcId] || "", sr, escola.numSalas)) || 0,
+                                  prof: 1,
+                                })),
+                              })}
+                                title="Abre o Romaneio já preenchido com esta escola"
+                                style={{ display: "block", marginTop: 4, background: "#111", color: "#39DF18", border: "none", borderRadius: 4, padding: "3px 8px", fontSize: 10, fontWeight: 700, fontFamily: font, cursor: "pointer", whiteSpace: "nowrap" }}>
+                                → Gerar romaneio
+                              </button>
+                            )}
+                          </td>
                           <td style={{ padding: "4px 8px", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>
                             {editandoGc === s.gcId ? (
                               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -1756,6 +1775,7 @@ export default function Dashboard() {
   const [cicloAtivo, setCicloAtivo]     = useState(null);
   const [ciclosHist, setCiclosHist]     = useState([]);
   const [modalCiclo, setModalCiclo]     = useState(false);
+  const [pedidoRomaneio, setPedidoRomaneio] = useState(null);   // pedido vindo do Inspiramaker
 
   // Entra no sistema a partir de uma sessão do Supabase Auth (só se o e-mail estiver ativo em "usuarios")
   async function entrarComSessao(emailAuth) {
@@ -2222,7 +2242,7 @@ export default function Dashboard() {
                     <div key={g.grupo}>
                       <div style={{ padding: "10px 18px 4px", fontSize: 10, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: "#888", fontFamily: font }}>{g.grupo}</div>
                       {g.itens.map(i => (
-                        <button key={i.id} onClick={() => { setView(i.id); setMenuAberto(false); }}
+                        <button key={i.id} onClick={() => { if (i.id === "romaneio") setPedidoRomaneio(null); setView(i.id); setMenuAberto(false); }}
                           style={{ display: "block", width: "100%", textAlign: "left", border: "none", cursor: "pointer", padding: "10px 18px", fontSize: 14, fontFamily: font,
                             background: view === i.id ? "#39DF18" : "#fff", color: "#111", fontWeight: view === i.id ? 800 : 600 }}>
                           {i.label}
@@ -2267,7 +2287,8 @@ export default function Dashboard() {
       )}
 
       {view === "inspiramaker" && (
-        <InspiramakerDashboard onVoltar={() => setView("dashboard")} />
+        <InspiramakerDashboard onVoltar={() => setView("dashboard")}
+          onGerarRomaneio={(pedido) => { setPedidoRomaneio(pedido); setView("romaneio"); }} />
       )}
 
       {view === "baseescolas" && (
@@ -2287,7 +2308,7 @@ export default function Dashboard() {
             </button>
           </div>
           <div style={{ flex: 1, overflow: "hidden" }}>
-            <RomaneioTab altura="calc(100vh - 41px)" onFecharRomaneio={salvarRomaneioFechado} />
+            <RomaneioTab altura="calc(100vh - 41px)" onFecharRomaneio={salvarRomaneioFechado} pedidoInicial={pedidoRomaneio || undefined} />
           </div>
         </div>
       )}

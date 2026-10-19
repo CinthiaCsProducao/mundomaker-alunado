@@ -4,7 +4,7 @@
  * Mudança aqui some na próxima geração. Mude lá e gere de novo.
  */
 import React, { useState } from 'react';
-import { OrderInput } from './components/OrderInput';
+import { OrderInput, PedidoInicial } from './components/OrderInput';
 import { ManifestView } from './components/ManifestView';
 import { generateManifest, dividirPorDestino, saiEmDuasRemessas } from './lib/packaging';
 import { OrderItem, Manifest } from './types';
@@ -33,7 +33,9 @@ export type RomaneioFechado = {
   xlsx: Blob;
 };
 
-export default function App({ onFecharRomaneio }: { onFecharRomaneio?: (dados: RomaneioFechado) => Promise<void> | void }) {
+export type { PedidoInicial };
+
+export default function App({ onFecharRomaneio, pedidoInicial }: { onFecharRomaneio?: (dados: RomaneioFechado) => Promise<void> | void; pedidoInicial?: PedidoInicial }) {
   const [remessas, setRemessas] = useState<Remessa[] | null>(null);
   const [atual, setAtual] = useState(0);
   const [aviso, setAviso] = useState<string[]>([]);
@@ -123,5 +125,5 @@ export default function App({ onFecharRomaneio }: { onFecharRomaneio?: (dados: R
     );
   }
 
-  return <OrderInput onGenerate={handleGenerate} />;
+  return <OrderInput onGenerate={handleGenerate} pedidoInicial={pedidoInicial} />;
 }
