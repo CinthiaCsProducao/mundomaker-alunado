@@ -326,6 +326,7 @@ export default function AlunadoForm() {
     if (!dadosGerais.nome.trim()) return "Nome da escola é obrigatório.";
     if (!dadosGerais.responsavel.trim()) return "Responsável da escola é obrigatório.";
     if (!dadosGerais.programa) return "Selecione o programa da escola.";
+    if (!(Number(dadosGerais.num_salas_maker) >= 1)) return "Informe quantas salas maker a escola possui (mínimo 1).";
     if (series.length === 0) return "Adicione pelo menos uma série.";
     for (const s of series) {
       if (s.turmas.length === 0) return `A série '${s.serie}' precisa de ao menos uma turma.`;
@@ -499,8 +500,8 @@ export default function AlunadoForm() {
                     </select></div>
                 </div>
                 <div style={{ maxWidth:240 }}>
-                  <div style={S.field}><label style={S.label}>Quantas salas maker a escola possui?</label>
-                    <input style={S.input} type="number" min="0" value={dadosGerais.num_salas_maker} onChange={e => setDadosGerais({...dadosGerais,num_salas_maker:e.target.value})} placeholder="0"/></div>
+                  <div style={S.field}><label style={S.label}>Quantas salas maker a escola possui? *</label>
+                    <input style={S.input} type="number" min="1" required value={dadosGerais.num_salas_maker} onChange={e => setDadosGerais({...dadosGerais,num_salas_maker:e.target.value})} placeholder="Ex.: 1"/></div>
                 </div>
               </div>
             </div>
