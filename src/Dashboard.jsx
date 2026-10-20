@@ -1079,7 +1079,7 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
             ${cols}
             <td style="text-align:center;font-weight:700;padding:5px 10px;border:1px solid #ddd;">${tot}</td>
             <td style="text-align:center;font-weight:800;padding:5px 10px;border:1px solid #ddd;background:#e8f5e9;">${base}</td>
-            <td style="text-align:center;padding:5px 10px;border:1px solid #ddd;">${s.introNome ? "" : 1}</td>
+            <td style="text-align:center;padding:5px 10px;border:1px solid #ddd;">1</td>
             <td style="text-align:center;font-weight:800;padding:5px 10px;border:1px solid #ddd;background:#fff3e0;">${comp}</td>
           </tr>`;
       });
@@ -1170,7 +1170,7 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
             projDe(s) + (s.introNome ? " (Introdutório)" : ""),
             s.serie,
             ...turmaCols.map((_, i) => (s.turmas[i] ? s.turmas[i].num_alunos : "")),
-            tot, base, s.introNome ? "" : 1, comp,
+            tot, base, 1, comp,
           ]);
           if (si === 0) linha.getCell(2).font = { bold: true };
           linha.getCell(colBase).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8F5E9" } };
@@ -1299,7 +1299,7 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
                                   introdutorio: !!sr.introNome,
                                   base: sr.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0),
                                   comp: Number(compDe(sr, escola)) || 0,
-                                  prof: sr.introNome ? 0 : 1,
+                                  prof: 1,
                                 })),
                               })}
                                 title="Abre o Romaneio já preenchido com esta escola"
@@ -1353,7 +1353,7 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
                           })}
                           <td style={{ padding: "8px 14px", textAlign: "right", fontWeight: 700, borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{tot}</td>
                           <td style={{ padding: "8px 14px", textAlign: "right", fontWeight: 800, color: "#39DF18", fontSize: 14, background: "#f9fff5", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{base}</td>
-                          <td style={{ padding: "8px 14px", textAlign: "center", color: "#888", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{s.introNome ? "—" : 1}</td>
+                          <td style={{ padding: "8px 14px", textAlign: "center", color: "#888", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>1</td>
                           <td style={{ padding: "8px 14px", textAlign: "right", fontWeight: 800, color: "#FFA300", fontSize: 14, background: "#fff8f0", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{comp}</td>
                         </tr>
                       );
