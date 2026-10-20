@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "./supabaseClient";
-import { urlAssinada } from "./storageSeguro";
+import { urlAssinada, auditar } from "./storageSeguro";
 
 const BUCKET = "romaneios";
 const font = "'Archivo', 'Segoe UI', sans-serif";
@@ -41,6 +41,8 @@ export default function HistoricoRomaneios({ onVoltar }) {
     return () => { vivo = false; };
   }, [visualizando]);
   const [baixando, setBaixando] = useState("");
+  const [qrDe, setQrDe] = useState(null);   // romaneio com o link público aberto
+  const [copiado, setCopiado] = useState(false);
   const [cicloSel, setCicloSel] = useState("__aberto__");
 
   async function carregar() {
@@ -93,6 +95,30 @@ export default function HistoricoRomaneios({ onVoltar }) {
     await supabase.storage.from(BUCKET).remove([r.pdf_path, r.xlsx_path].filter(Boolean));
     await supabase.from("romaneios_historico").delete().eq("id", r.id);
     carregar();
+  }
+
+  const linkPublico = (r) => `${window.location.origin}/r/${r.token_publico}`;
+
+  async function publicarQR(r) {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = r.token_publico || crypto.randomUUID();
+    const { data, error } = await supabase.from("romaneios_historico")
+      .update({ token_publico: token, publicado_em: r.publicado_em || new Date().toISOString(), publicado_por: r.publicado_por || sess?.session?.user?.email || null })
+      .eq("id", r.id).select().single();
+    if (error) { alert("Erro ao publicar: " + error.message); return; }
+    auditar("publicar_romaneio", "romaneios_historico", r.id);
+    setLista(l => l.map(x => x.id === r.id ? data : x));
+    setQrDe(data);
+  }
+
+  async function despublicarQR(r) {
+    if (!window.confirm("Despublicar? Etiquetas já impressas com esse link deixam de funcionar.")) return;
+    const { data, error } = await supabase.from("romaneios_historico")
+      .update({ token_publico: null }).eq("id", r.id).select().single();
+    if (error) { alert("Erro: " + error.message); return; }
+    auditar("despublicar_romaneio", "romaneios_historico", r.id);
+    setLista(l => l.map(x => x.id === r.id ? data : x));
+    setQrDe(null);
   }
 
   const btn = { border: "none", borderRadius: 4, padding: "6px 12px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" };
@@ -163,6 +189,11 @@ export default function HistoricoRomaneios({ onVoltar }) {
                       <button onClick={() => handleBaixar(r, "xlsx")} disabled={baixando === r.id + "xlsx"} style={{ ...btn, background: "#1b8f3a", color: "#fff" }}>
                         {baixando === r.id + "xlsx" ? "..." : "↓ Excel"}
                       </button>
+                      <button onClick={() => (r.token_publico ? setQrDe(r) : publicarQR(r))}
+                        title={r.token_publico ? "Link público publicado" : "Publicar o PDF e gerar o link público"}
+                        style={{ ...btn, background: r.token_publico ? "#39DF18" : "#fff", color: "#111", border: "1px solid #111" }}>
+                        {r.token_publico ? "Link ✓" : "Link"}
+                      </button>
                       <button onClick={() => handleExcluir(r)} style={{ ...btn, background: "#eee", color: "#555" }}>🗑</button>
                     </div>
                   </td>
@@ -170,6 +201,24 @@ export default function HistoricoRomaneios({ onVoltar }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {qrDe && qrDe.token_publico && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setQrDe(null)}>
+          <div style={{ background: "#fff", borderRadius: 8, padding: 24, width: "100%", maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>Link público do romaneio</div>
+            <div style={{ fontSize: 12, color: "#777", marginBottom: 12 }}>{qrDe.escola} · {qrDe.remessa} · {qrDe.data_romaneio}</div>
+            <input readOnly value={linkPublico(qrDe)} onFocus={e => e.target.select()}
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #ccc", borderRadius: 4, fontSize: 13, boxSizing: "border-box" }} />
+            <div style={{ fontSize: 11, color: "#b26a00", marginTop: 8 }}>Qualquer pessoa com este link vê o PDF deste romaneio. Use-o para gerar o QR code na impressora Zebra.</div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 16 }}>
+              <button onClick={() => despublicarQR(qrDe)} style={{ ...btn, background: "#fff", color: "#D81E27", border: "1px solid #D81E27" }}>Despublicar</button>
+              <button onClick={() => { navigator.clipboard && navigator.clipboard.writeText(linkPublico(qrDe)); setCopiado(true); setTimeout(() => setCopiado(false), 2000); }}
+                style={{ ...btn, background: "#39DF18", color: "#000" }}>{copiado ? "Copiado ✓" : "Copiar link"}</button>
+              <button onClick={() => setQrDe(null)} style={{ ...btn, background: "#fff", color: "#111", border: "1px solid #ccc" }}>Fechar</button>
+            </div>
+          </div>
         </div>
       )}
 
