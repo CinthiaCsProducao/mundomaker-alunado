@@ -917,6 +917,15 @@ function EscolasDashboard({ onVoltar }) {
 }
 
 // ─── Base Escolas Dashboard ──────────────────────────────────
+// Compara séries escritas de jeitos diferentes: "1º ano", "1º ano EF", "EI", "Ed. Infantil"...
+function chaveSerieSimples(t) {
+  const x = String(t || "").toLowerCase();
+  if (/infantil|^\s*ei\b|educa/.test(x)) return "ei";
+  const n = (x.match(/\d/) || [""])[0];
+  if (/m[eé]dio|\bem\b/.test(x)) return "em" + n;
+  return "ef" + n;
+}
+
 function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
   const [dados, setDados]       = useState([]);
   const [loading, setLoading]   = useState(true);
@@ -992,6 +1001,12 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
         supabase.from("classes").select("grade_class_id, school_id, turma, num_alunos").in("school_id", ids).order("turma"),
       ]);
 
+      // Introdutórios cadastrados na Base de Escolas (por série)
+      const baseIds = escolasUnicas.map(e => e.escola_base_id).filter(Boolean);
+      const { data: allPE } = baseIds.length > 0
+        ? await supabase.from("projetos_escola").select("escola_id, serie, intro").in("escola_id", baseIds)
+        : { data: [] };
+
       const projetosInit = {};
       (allGC || []).forEach(gc => { if (gc.projeto) projetosInit[gc.id] = gc.projeto; });
       setProjetos(projetosInit);
@@ -1004,7 +1019,8 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
           serie: s.serie,
           turmas: cl.filter(t => t.grade_class_id === s.id).sort((a, b) => (a.turma || "").localeCompare(b.turma || "")),
         }));
-        return { id: escola.id, nome: escola.nome, idioma: escola.idioma_material || "Portugues", numSalas: escola.num_salas_maker || 0, series };
+        const intros = (allPE || []).filter(pe => pe.escola_id === escola.escola_base_id && pe.intro);
+        return { id: escola.id, nome: escola.nome, idioma: escola.idioma_material || "Portugues", numSalas: escola.num_salas_maker || 0, series, intros };
       // Só exibe escolas que têm pelo menos 1 aluno no ciclo atual
       }).filter(e => e.series.some(s => s.turmas.some(t => (t.num_alunos || 0) > 0)));
 
@@ -1270,13 +1286,25 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
                               <button onClick={() => onGerarRomaneio({
                                 chave: `${escola.id}-${Date.now()}`,
                                 escola: escola.nome,
-                                itens: escola.series.map(sr => ({
-                                  serie: sr.serie,
-                                  projeto: projetos[sr.gcId] || "",
-                                  base: sr.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0),
-                                  comp: Number(calcularComplementar(projetos[sr.gcId] || "", sr, escola.numSalas)) || 0,
-                                  prof: 1,
-                                })),
+                                itens: [
+                                  ...escola.series.map(sr => ({
+                                    serie: sr.serie,
+                                    projeto: projetos[sr.gcId] || "",
+                                    base: sr.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0),
+                                    comp: Number(calcularComplementar(projetos[sr.gcId] || "", sr, escola.numSalas)) || 0,
+                                    prof: 1,
+                                  })),
+                                  // Introdutório da série (Base de Escolas): mesma quantidade de caixas da série
+                                  ...(escola.intros || []).map(pe => {
+                                    const sr = escola.series.find(x => chaveSerieSimples(x.serie) === chaveSerieSimples(pe.serie));
+                                    if (!sr) return null;
+                                    return {
+                                      serie: sr.serie, projeto: pe.intro, introdutorio: true,
+                                      base: sr.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0),
+                                      comp: 0, prof: 0,
+                                    };
+                                  }).filter(Boolean),
+                                ],
                               })}
                                 title="Abre o Romaneio já preenchido com esta escola"
                                 style={{ display: "block", marginTop: 4, background: "#111", color: "#39DF18", border: "none", borderRadius: 4, padding: "3px 8px", fontSize: 10, fontWeight: 700, fontFamily: font, cursor: "pointer", whiteSpace: "nowrap" }}>

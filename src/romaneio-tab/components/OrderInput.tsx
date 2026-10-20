@@ -16,7 +16,7 @@ export type PedidoInicial = {
   chave: string;               // muda a cada envio; é o que faz o pedido ser aplicado de novo
   escola: string;
   linha?: string;
-  itens: Array<{ serie: string; projeto: string; base: number; comp: number; prof: number }>;
+  itens: Array<{ serie: string; projeto: string; base: number; comp: number; prof: number; introdutorio?: boolean }>;
 };
 
 interface OrderInputProps {
@@ -491,7 +491,7 @@ export const OrderInput: React.FC<OrderInputProps> = ({ onGenerate, pedidoInicia
   useEffect(() => {
     if (!pedidoInicial || aplicadoRef.current === pedidoInicial.chave) return;
     aplicadoRef.current = pedidoInicial.chave;
-    const norm = (t: string) => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+    const norm = (t: string) => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\b1\b/g, 'primeiro').replace(/\s+/g, ' ').trim();
     const chaveSerie = (t: string) => { try { return parseSchoolYear(t).key; } catch { return norm(t); } };
     const q: Record<string, number> = {};
     const t: Record<string, number> = {};
@@ -505,7 +505,11 @@ export const OrderInput: React.FC<OrderInputProps> = ({ onGenerate, pedidoInicia
       const alvoSerie = chaveSerie(it.serie);
       const porNome = projetos.filter(p => norm(p.nome) === nomeAlvo || norm(p.nome).includes(nomeAlvo) || nomeAlvo.includes(norm(p.nome)));
       const exato = porNome.filter(p => norm(p.nome) === nomeAlvo);
-      const lista = exato.length > 0 ? exato : porNome;
+      const base0 = exato.length > 0 ? exato : porNome;
+      // [MODIFICADO NO MUNDO MAKER] Introdutório procura primeiro o projeto introdutório do catálogo; o regular, o não introdutório
+      const ehIntro = (p: Projeto) => !!p.base?.caixas[0].introdutorio;
+      const preferidos = base0.filter(p => ehIntro(p) === !!it.introdutorio);
+      const lista = preferidos.length > 0 ? preferidos : base0;
       const proj = lista.find(p => chaveSerie(p.serie) === alvoSerie) || lista[0];
       if (!proj || !(proj.base || proj.comp)) { faltou.push(`${it.projeto} (${it.serie})`); return; }
       const idBase = proj.base?.caixas[0].id;
