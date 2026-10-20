@@ -550,7 +550,7 @@ export const OrderInput: React.FC<OrderInputProps> = ({ onGenerate, pedidoInicia
       const agoraComp = compId ? (quantities[compId] || 0) : 0;
       const entrou = (agoraBase > 1 && antesBase <= 1) || (!!compId && agoraComp > 1 && antesComp <= 1);
       if (entrou && !(proximo[baseId] > 0)) { proximo[baseId] = 1; mudou = true; }
-      if (agoraBase === 0 && agoraComp === 0 && proximo[baseId] > 0) { delete proximo[baseId]; mudou = true; }
+      // [MODIFICADO NO MUNDO MAKER] Zerar os alunos não apaga mais o professor: a quantidade de professor só muda à mão.
     });
     if (mudou) setTeacherQuantities(proximo);
     anteriores.current = { ...quantities };
