@@ -9,6 +9,7 @@ import PopsDocumentos from "./PopsDocumentos";
 import Familias from "./Familias";
 import CursoMaker from "./CursoMaker";
 import LgpdAdmin from "./LgpdAdmin";
+import Mapeamentos, { FaixaMapeamentos } from "./Mapeamentos";
 import SinoNotificacoes from "./Notificacoes";
 import { supabase } from "./supabaseClient";
 import { urlAssinada, auditar } from "./storageSeguro";
@@ -91,15 +92,27 @@ async function gerarPDF(escola, detalhes, hist) {
 }
 
 function gerarPDFBase(escola, detalhes, hist, win) {
-  const seriesHtml = detalhes
-    ? detalhes.series.map(s => {
-        const turmas = detalhes.turmas.filter(t => t.grade_class_id === s.id);
+  // O envio guarda uma cópia completa do que foi preenchido; ela tem prioridade sobre a tabela de escolas
+  const snap = (hist && hist.dados_snapshot) || {};
+  const dg = snap.dadosGerais || {};
+  const pick = (a, b) => (a !== undefined && a !== null && String(a).trim() !== "" ? a : b);
+
+  const seriesPdf = Array.isArray(snap.series) && snap.series.length > 0
+    ? snap.series.map(sr => ({ serie: sr.serie, projeto: sr.projeto, turmas: sr.turmas || [] }))
+    : (detalhes ? detalhes.series.map(sr => ({
+        serie: sr.serie, projeto: sr.projeto,
+        turmas: detalhes.turmas.filter(t => t.grade_class_id === sr.id),
+      })) : []);
+
+  const seriesHtml = seriesPdf.length > 0
+    ? seriesPdf.map(sr => {
+        const sub = sr.turmas.reduce((a, t) => a + (parseInt(t.num_alunos, 10) || 0), 0);
         return `
-          <tr><td colspan="3" style="background:#f5f5f5;font-weight:700;padding:8px 14px;font-size:12px;">${esc(s.serie)}</td></tr>
-          ${turmas.map(t => `
+          <tr><td colspan="3" style="background:#f5f5f5;font-weight:700;padding:8px 14px;font-size:12px;">${esc(sr.serie)}${sr.projeto ? ` — Projeto: ${esc(sr.projeto)}` : ""} <span style="font-weight:400;color:#666;">(${sub} alunos)</span></td></tr>
+          ${sr.turmas.map(t => `
             <tr>
               <td style="padding:7px 14px 7px 28px;">Turma ${esc(t.turma)}</td>
-              <td style="padding:7px 14px;">${t.num_alunos} alunos</td>
+              <td style="padding:7px 14px;">${esc(t.num_alunos)} alunos</td>
               <td style="padding:7px 14px;">${esc(t.professor_maker || "—")}</td>
             </tr>
           `).join("")}
@@ -107,14 +120,25 @@ function gerarPDFBase(escola, detalhes, hist, win) {
       }).join("")
     : "<tr><td colspan='3'>Sem dados</td></tr>";
 
-  const fmtDate = (val) => val ? new Date(val + "T12:00:00").toLocaleDateString("pt-BR") : "—";
+  const fmtDate = (val) => val ? new Date(String(val).slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR") : "—";
 
-  const enderecoCompleto = [
-    escola.rua && `${escola.rua}${escola.numero ? ", " + escola.numero : ""}${escola.complemento ? " — " + escola.complemento : ""}`,
-    escola.bairro,
-    [escola.cidade, escola.estado].filter(Boolean).join(" — "),
-    escola.cep,
-  ].filter(Boolean).join(" · ") || escola.endereco || "—";
+  const rua = pick(dg.logradouro, escola.rua);
+  const enderecoMontado = [
+    rua && `${rua}${pick(dg.numero, escola.numero) ? ", " + pick(dg.numero, escola.numero) : ""}${pick(dg.complemento, escola.complemento) ? " — " + pick(dg.complemento, escola.complemento) : ""}`,
+    pick(dg.bairro, escola.bairro),
+    [pick(dg.cidade, escola.cidade), pick(dg.estado, escola.estado)].filter(Boolean).join(" — "),
+  ].filter(Boolean).join(" · ");
+  const enderecoCompleto = esc(enderecoMontado || escola.endereco || "—");
+  const cep = pick(dg.cep, escola.cep);
+
+  const responsavelEscola = pick(dg.responsavel, escola.responsavel_escola);
+  const telefone = pick(dg.telefone, escola.telefone);
+  const tipoFrete = pick(dg.tipo_frete, escola.tipo_frete);
+  const dataInicio = pick(dg.data_inicio, escola.data_inicio);
+  const dataReceb = pick(dg.data_recebimento, escola.data_recebimento);
+  const programa = pick(dg.programa, escola.programa);
+  const idioma = pick(dg.idioma_material, escola.idioma_material);
+  const salasMaker = pick(dg.num_salas_maker, escola.num_salas_maker);
 
   win.document.write(`
     <!DOCTYPE html><html><head>
@@ -153,13 +177,13 @@ function gerarPDFBase(escola, detalhes, hist, win) {
       <div class="sec-body">
         <div class="grid">
           <div><div class="f-label">Nome</div><div class="f-val">${esc(escola.nome)}</div></div>
-          <div><div class="f-label">Responsável</div><div class="f-val">${esc(escola.responsavel_escola || "—")}</div></div>
-          <div><div class="f-label">Telefone</div><div class="f-val">${esc(escola.telefone || "—")}</div></div>
-          <div><div class="f-label">CEP</div><div class="f-val">${esc(escola.cep || "—")}</div></div>
+          <div><div class="f-label">Responsável</div><div class="f-val">${esc(responsavelEscola || "—")}</div></div>
+          <div><div class="f-label">Telefone</div><div class="f-val">${esc(telefone || "—")}</div></div>
+          <div><div class="f-label">CEP</div><div class="f-val">${esc(cep || "—")}</div></div>
           <div style="grid-column:1/-1"><div class="f-label">Endereço</div><div class="f-val">${enderecoCompleto}</div></div>
-          <div><div class="f-label">Tipo de Frete</div><div class="f-val">${esc(escola.tipo_frete || "—")}</div></div>
-          <div><div class="f-label">Início das Aulas</div><div class="f-val">${fmtDate(escola.data_inicio)}</div></div>
-          <div><div class="f-label">Recebimento do Material</div><div class="f-val">${fmtDate(escola.data_recebimento)}</div></div>
+          <div><div class="f-label">Tipo de Frete</div><div class="f-val">${esc(tipoFrete || "—")}</div></div>
+          <div><div class="f-label">Início das Aulas</div><div class="f-val">${fmtDate(dataInicio)}</div></div>
+          <div><div class="f-label">Recebimento do Material</div><div class="f-val">${fmtDate(dataReceb)}</div></div>
         </div>
       </div>
     </div>
@@ -167,8 +191,9 @@ function gerarPDFBase(escola, detalhes, hist, win) {
       <div class="sec-title">2. Programa e Idioma</div>
       <div class="sec-body">
         <div class="grid">
-          <div><div class="f-label">Programa</div><div class="f-val">${esc(escola.programa || "—")}</div></div>
-          <div><div class="f-label">Idioma do Material</div><div class="f-val">${esc(escola.idioma_material || "—")}</div></div>
+          <div><div class="f-label">Programa</div><div class="f-val">${esc(programa || "—")}</div></div>
+          <div><div class="f-label">Idioma do Material</div><div class="f-val">${esc(idioma || "—")}</div></div>
+          <div><div class="f-label">Salas Maker da Escola</div><div class="f-val">${esc(salasMaker ?? "—")}</div></div>
         </div>
       </div>
     </div>
@@ -181,7 +206,7 @@ function gerarPDFBase(escola, detalhes, hist, win) {
         </table>
         <div class="total-box">
           <div class="total-num">${escola.total_alunos?.toLocaleString("pt-BR") || 0}</div>
-          <div class="total-label">Total de Alunos</div>
+          <div class="total-label">Total de Alunos${escola.cluster ? ` · Cluster ${esc(escola.cluster)}` : ""}</div>
         </div>
       </div>
     </div>
@@ -2206,6 +2231,9 @@ export default function Dashboard() {
       { id: "familias", label: "TechLab", show: !!(perm.familias || isAdmin) },
       { id: "cursomaker", label: "Curso Maker", show: !!(perm.cursoMaker || isAdmin) },
     ] },
+    { grupo: "Planejamento", itens: [
+      { id: "mapeamentos", label: "Mapeamentos", show: !!(perm.mapeamentos || isAdmin) },
+    ] },
     { grupo: "Administração", itens: [
       { id: "usuarios", label: "Usuários", show: isAdmin },
       { id: "lgpd", label: "LGPD e auditoria", show: isAdmin },
@@ -2228,7 +2256,7 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="mm-acoes" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <SinoNotificacoes tema="claro" />
+          <SinoNotificacoes tema="claro" onAbrirMapeamentos={() => setView("mapeamentos")} />
           <div style={{ position: "relative" }}>
             <button onClick={() => setMenuAberto(m => !m)}
               style={{ background: "#000", color: "#fff", border: "none", borderRadius: 4, padding: "9px 18px", fontSize: 13, fontWeight: 800, fontFamily: font, cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -2333,6 +2361,10 @@ export default function Dashboard() {
         <GerenciarUsuarios onVoltar={() => setView("dashboard")} />
       )}
 
+      {view === "mapeamentos" && (perm.mapeamentos || isAdmin) && (
+        <Mapeamentos onVoltar={() => setView("dashboard")} />
+      )}
+
       {view === "lgpd" && isAdmin && (
         <LgpdAdmin onVoltar={() => setView("dashboard")} />
       )}
@@ -2347,6 +2379,7 @@ export default function Dashboard() {
             <div style={{ textAlign: "center", padding: 60, color: "#666", fontSize: 16 }}>Carregando dados...</div>
           ) : (
             <>
+              {(perm.mapeamentos || isAdmin) && <FaixaMapeamentos onAbrir={() => setView("mapeamentos")} />}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
                 <div style={{ background: "#111", borderRadius: 8, padding: "24px 28px" }}>
                   <div style={{ fontSize: 48, fontWeight: 800, color: "#39DF18", lineHeight: 1 }}>{totalAlunos.toLocaleString("pt-BR")}</div>

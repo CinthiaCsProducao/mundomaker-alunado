@@ -45,6 +45,11 @@ function gerarPDFFormulario(dadosGerais, series, totalAlunos, responsavel, calen
       <div><div class="f-label">Nome</div><div class="f-val">${esc(dadosGerais.nome)}</div></div>
       <div><div class="f-label">Responsável</div><div class="f-val">${esc(dadosGerais.responsavel||"—")}</div></div>
       <div><div class="f-label">Telefone</div><div class="f-val">${esc(dadosGerais.telefone||"—")}</div></div>
+      <div><div class="f-label">CEP</div><div class="f-val">${esc(dadosGerais.cep||"—")}</div></div>
+      <div style="grid-column:1/-1"><div class="f-label">Endereço</div><div class="f-val">${esc([
+        dadosGerais.logradouro && `${dadosGerais.logradouro}${dadosGerais.numero ? ", " + dadosGerais.numero : ""}${dadosGerais.complemento ? " — " + dadosGerais.complemento : ""}`,
+        dadosGerais.bairro, [dadosGerais.cidade, dadosGerais.estado].filter(Boolean).join(" — "),
+      ].filter(Boolean).join(" · ") || "—")}</div></div>
       <div><div class="f-label">Tipo de Frete</div><div class="f-val">${esc(dadosGerais.tipo_frete||"—")}</div></div>
       <div><div class="f-label">Início das Aulas</div><div class="f-val">${fmtDate(dadosGerais.data_inicio)}</div></div>
       <div><div class="f-label">Recebimento do Material</div><div class="f-val">${fmtDate(dadosGerais.data_recebimento)}</div></div>
@@ -52,6 +57,7 @@ function gerarPDFFormulario(dadosGerais, series, totalAlunos, responsavel, calen
     <div class="section"><div class="sec-title">2. Programa e Idioma</div><div class="sec-body"><div class="grid">
       <div><div class="f-label">Programa</div><div class="f-val">${esc(dadosGerais.programa||"—")}</div></div>
       <div><div class="f-label">Idioma do Material</div><div class="f-val">${esc(dadosGerais.idioma_material||"—")}</div></div>
+      <div><div class="f-label">Salas Maker da Escola</div><div class="f-val">${esc(dadosGerais.num_salas_maker||"—")}</div></div>
     </div></div></div>
     <div class="section"><div class="sec-title">3. Séries e Turmas</div><div class="sec-body">
       <table><thead><tr><th>Série / Turma</th><th>Alunos</th><th>Professor Maker</th></tr></thead><tbody>${seriesHtml}</tbody></table>
