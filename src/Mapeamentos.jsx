@@ -44,6 +44,11 @@ export function FaixaMapeamentos({ onAbrir }) {
   );
 }
 
+const fmtQuando = (iso) => {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString("pt-BR")} às ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+};
+
 const inp = { width: "100%", padding: "9px 12px", border: "1px solid #DCDDDE", borderRadius: 4, fontSize: 14, fontFamily: fontB, boxSizing: "border-box" };
 const lbl = { display: "block", fontSize: 11, fontWeight: 700, fontFamily: font, letterSpacing: ".05em", textTransform: "uppercase", color: "#6D6E71" };
 
@@ -85,9 +90,17 @@ export default function Mapeamentos({ onVoltar }) {
   const [lista, setLista] = useState(null);
   const [modal, setModal] = useState(null);
   const [programa, setPrograma] = useState("");
+  const [historico, setHistorico] = useState({});   // mapeamento_id -> [{acao, usuario_nome, criado_em}]
+  const [abertos, setAbertos] = useState({});
   const anoAtual = new Date().getFullYear();
 
-  const carregar = useCallback(async () => setLista(await buscarMapeamentos()), []);
+  const carregar = useCallback(async () => {
+    setLista(await buscarMapeamentos());
+    const { data } = await supabase.from("mapeamentos_historico").select("*").order("criado_em", { ascending: false });
+    const por = {};
+    (data || []).forEach(h => { (por[h.mapeamento_id] = por[h.mapeamento_id] || []).push(h); });
+    setHistorico(por);
+  }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
   async function salvar(dados) {
@@ -100,7 +113,17 @@ export default function Mapeamentos({ onVoltar }) {
     setModal(null); carregar();
   }
   async function marcar(m, verificado) {
-    await supabase.from("mapeamentos").update({ verificado_ano: verificado ? anoAtual : null, atualizado_em: new Date().toISOString() }).eq("id", m.id);
+    const { data: sess } = await supabase.auth.getSession();
+    const email = sess?.session?.user?.email;
+    if (!email) { alert("Sessão expirada. Entre novamente."); return; }
+    const { data: u } = await supabase.from("usuarios").select("nome").eq("email", email.toLowerCase()).maybeSingle();
+    const nome = u?.nome || email;
+    const agora = new Date().toISOString();
+    const { error } = await supabase.from("mapeamentos").update(verificado
+      ? { verificado_ano: anoAtual, verificado_por: nome, verificado_em: agora, atualizado_em: agora }
+      : { verificado_ano: null, verificado_por: null, verificado_em: null, atualizado_em: agora }).eq("id", m.id);
+    if (error) { alert("Erro: " + error.message); return; }
+    await supabase.from("mapeamentos_historico").insert([{ mapeamento_id: m.id, acao: verificado ? "verificado" : "reaberto", usuario_email: email, usuario_nome: nome }]);
     carregar();
   }
   async function excluir(m) {
@@ -152,8 +175,13 @@ export default function Mapeamentos({ onVoltar }) {
                     <div>
                       <div style={{ fontSize: 16, fontWeight: 800 }}>{m.titulo}</div>
                       <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
-                        {m.programa}{m.verificado_ano ? ` · verificado em ${m.verificado_ano}` : ""}
+                        {m.programa}
                       </div>
+                      {m.verificado_em && (
+                        <div style={{ fontSize: 12, color: "#148A00", fontWeight: 700, marginTop: 4 }}>
+                          ✓ Verificado por {m.verificado_por || "—"} em {fmtQuando(m.verificado_em)}
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: "flex", gap: 6, alignItems: "flex-start", flexWrap: "wrap" }}>
                       {m.verificado_ano === anoAtual
@@ -163,6 +191,19 @@ export default function Mapeamentos({ onVoltar }) {
                       <button onClick={() => excluir(m)} style={{ ...btnSec, color: "#D81E27", borderColor: "#D81E27" }}>Excluir</button>
                     </div>
                   </div>
+                  {(historico[m.id] || []).length > 0 && (
+                    <div style={{ marginTop: 10 }}>
+                      <button onClick={() => setAbertos(a => ({ ...a, [m.id]: !a[m.id] }))}
+                        style={{ background: "none", border: "none", color: "#666", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0, fontFamily: font }}>
+                        {abertos[m.id] ? "▾" : "▸"} Histórico de verificações ({historico[m.id].length})
+                      </button>
+                      {abertos[m.id] && historico[m.id].map(h => (
+                        <div key={h.id} style={{ fontSize: 12, color: "#555", fontFamily: fontB, marginTop: 4 }}>
+                          {h.acao === "verificado" ? "✓ Verificado" : "↺ Reaberto"} por {h.usuario_nome || h.usuario_email} em {fmtQuando(h.criado_em)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {m.descricao && <div style={{ fontSize: 14, color: "#333", marginTop: 10, whiteSpace: "pre-wrap", fontFamily: fontB, lineHeight: 1.5 }}>{m.descricao}</div>}
                 </div>
               );
