@@ -969,6 +969,9 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
     return 0;
   }
 
+  const projDe = (sr) => sr.introNome || projetos[sr.gcId] || "";
+  const compDe = (sr, escola) => sr.introNome ? 0 : calcularComplementar(projetos[sr.gcId] || "", sr, escola.numSalas);
+
   async function salvarProjeto(gcId, valor) {
     await supabase.from("grade_classes").update({ projeto: valor }).eq("id", gcId);
   }
@@ -1014,13 +1017,16 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
       const resultado = escolasUnicas.map(escola => {
         const gc = (allGC || []).filter(g => g.school_id === escola.id);
         const cl = (allCL || []).filter(c => c.school_id === escola.id);
-        const series = gc.map(s => ({
-          gcId: s.id,
-          serie: s.serie,
-          turmas: cl.filter(t => t.grade_class_id === s.id).sort((a, b) => (a.turma || "").localeCompare(b.turma || "")),
-        }));
+        const series = [];
         const intros = (allPE || []).filter(pe => pe.escola_id === escola.escola_base_id && pe.intro);
-        return { id: escola.id, nome: escola.nome, idioma: escola.idioma_material || "Portugues", numSalas: escola.num_salas_maker || 0, series, intros };
+        gc.forEach(s => {
+          const turmas = cl.filter(t => t.grade_class_id === s.id).sort((a, b) => (a.turma || "").localeCompare(b.turma || ""));
+          series.push({ gcId: s.id, serie: s.serie, turmas });
+          // Introdutório da série (Base de Escolas): mesma quantidade de alunos, linha própria
+          const pe = intros.find(x => chaveSerieSimples(x.serie) === chaveSerieSimples(s.serie));
+          if (pe) series.push({ gcId: `intro-${s.id}`, serie: s.serie, turmas, introNome: pe.intro });
+        });
+        return { id: escola.id, nome: escola.nome, idioma: escola.idioma_material || "Portugues", numSalas: escola.num_salas_maker || 0, series };
       // Só exibe escolas que têm pelo menos 1 aluno no ciclo atual
       }).filter(e => e.series.some(s => s.turmas.some(t => (t.num_alunos || 0) > 0)));
 
@@ -1040,6 +1046,7 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
   let totalProfGeral   = 0;
   let totalCompGeral   = 0;
   filtrados.forEach(e => e.series.forEach(s => {
+    if (s.introNome) { totalBaseGeral += s.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0); return; }
     totalAlunosGeral += s.turmas.reduce((a, t) => a + (t.num_alunos || 0), 0);
     totalBaseGeral   += s.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0);
     totalProfGeral   += 1;
@@ -1061,8 +1068,8 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
         }).join("");
         const tot  = s.turmas.reduce((a, t) => a + (t.num_alunos || 0), 0);
         const base = s.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0);
-        const proj = projetos[s.gcId] || "";
-        const comp = calcularComplementar(proj, s, escola.numSalas);
+        const proj = projDe(s) + (s.introNome ? " (Introdutório)" : "");
+        const comp = compDe(s, escola);
         rows += `
           <tr style="background:${si % 2 === 0 ? "#fff" : "#f9f9f9"}">
             <td style="padding:5px 10px;border:1px solid #ddd;">${si === 0 ? esc(escola.idioma) : ""}</td>
@@ -1072,7 +1079,7 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
             ${cols}
             <td style="text-align:center;font-weight:700;padding:5px 10px;border:1px solid #ddd;">${tot}</td>
             <td style="text-align:center;font-weight:800;padding:5px 10px;border:1px solid #ddd;background:#e8f5e9;">${base}</td>
-            <td style="text-align:center;padding:5px 10px;border:1px solid #ddd;">1</td>
+            <td style="text-align:center;padding:5px 10px;border:1px solid #ddd;">${s.introNome ? "" : 1}</td>
             <td style="text-align:center;font-weight:800;padding:5px 10px;border:1px solid #ddd;background:#fff3e0;">${comp}</td>
           </tr>`;
       });
@@ -1156,14 +1163,14 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
         escola.series.forEach((s, si) => {
           const tot  = s.turmas.reduce((a, t) => a + (t.num_alunos || 0), 0);
           const base = s.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0);
-          const comp = calcularComplementar(projetos[s.gcId] || "", s, escola.numSalas);
+          const comp = compDe(s, escola);
           const linha = ws.addRow([
             si === 0 ? escola.idioma : "",
             si === 0 ? escola.nome : "",
-            projetos[s.gcId] || "",
+            projDe(s) + (s.introNome ? " (Introdutório)" : ""),
             s.serie,
             ...turmaCols.map((_, i) => (s.turmas[i] ? s.turmas[i].num_alunos : "")),
-            tot, base, 1, comp,
+            tot, base, s.introNome ? "" : 1, comp,
           ]);
           if (si === 0) linha.getCell(2).font = { bold: true };
           linha.getCell(colBase).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8F5E9" } };
@@ -1274,11 +1281,11 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
                     escola.series.map((s, si) => {
                       const tot    = s.turmas.reduce((a, t) => a + (t.num_alunos || 0), 0);
                       const base   = s.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0);
-                      const comp   = calcularComplementar(projetos[s.gcId] || "", s, escola.numSalas);
+                      const comp   = compDe(s, escola);
                       const primeiro = si === 0;
                       const ultimo   = si === escola.series.length - 1;
                       return (
-                        <tr key={`${escola.id}-${s.serie}`} style={{ borderTop: primeiro ? "2px solid #ddd" : "1px solid #f0f0f0", background: si % 2 === 0 ? "#fff" : "#fafafa" }}>
+                        <tr key={`${escola.id}-${s.gcId}`} style={{ borderTop: primeiro ? "2px solid #ddd" : "1px solid #f0f0f0", background: si % 2 === 0 ? "#fff" : "#fafafa" }}>
                           <td style={{ padding: "8px 14px", color: "#555", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{primeiro ? escola.idioma : ""}</td>
                           <td style={{ padding: "8px 14px", fontWeight: primeiro ? 700 : 400, color: "#111", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>
                             {primeiro ? escola.nome : ""}
@@ -1286,25 +1293,14 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
                               <button onClick={() => onGerarRomaneio({
                                 chave: `${escola.id}-${Date.now()}`,
                                 escola: escola.nome,
-                                itens: [
-                                  ...escola.series.map(sr => ({
-                                    serie: sr.serie,
-                                    projeto: projetos[sr.gcId] || "",
-                                    base: sr.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0),
-                                    comp: Number(calcularComplementar(projetos[sr.gcId] || "", sr, escola.numSalas)) || 0,
-                                    prof: 1,
-                                  })),
-                                  // Introdutório da série (Base de Escolas): mesma quantidade de caixas da série
-                                  ...(escola.intros || []).map(pe => {
-                                    const sr = escola.series.find(x => chaveSerieSimples(x.serie) === chaveSerieSimples(pe.serie));
-                                    if (!sr) return null;
-                                    return {
-                                      serie: sr.serie, projeto: pe.intro, introdutorio: true,
-                                      base: sr.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0),
-                                      comp: 0, prof: 0,
-                                    };
-                                  }).filter(Boolean),
-                                ],
+                                itens: escola.series.map(sr => ({
+                                  serie: sr.serie,
+                                  projeto: projDe(sr),
+                                  introdutorio: !!sr.introNome,
+                                  base: sr.turmas.reduce((a, t) => a + Math.ceil((t.num_alunos || 0) / 4), 0),
+                                  comp: Number(compDe(sr, escola)) || 0,
+                                  prof: sr.introNome ? 0 : 1,
+                                })),
                               })}
                                 title="Abre o Romaneio já preenchido com esta escola"
                                 style={{ display: "block", marginTop: 4, background: "#111", color: "#39DF18", border: "none", borderRadius: 4, padding: "3px 8px", fontSize: 10, fontWeight: 700, fontFamily: font, cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -1313,7 +1309,12 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
                             )}
                           </td>
                           <td style={{ padding: "4px 8px", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>
-                            {editandoGc === s.gcId ? (
+                            {s.introNome ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 140 }}>
+                                <span style={{ fontSize: 12, color: "#111", fontWeight: 600 }}>{s.introNome}</span>
+                                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: ".05em", color: "#0B6BCB", background: "#E8F1FB", borderRadius: 3, padding: "2px 6px" }}>INTRODUTÓRIO</span>
+                              </div>
+                            ) : editandoGc === s.gcId ? (
                               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                                 <input
                                   autoFocus
@@ -1352,7 +1353,7 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
                           })}
                           <td style={{ padding: "8px 14px", textAlign: "right", fontWeight: 700, borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{tot}</td>
                           <td style={{ padding: "8px 14px", textAlign: "right", fontWeight: 800, color: "#39DF18", fontSize: 14, background: "#f9fff5", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{base}</td>
-                          <td style={{ padding: "8px 14px", textAlign: "center", color: "#888", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>1</td>
+                          <td style={{ padding: "8px 14px", textAlign: "center", color: "#888", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{s.introNome ? "—" : 1}</td>
                           <td style={{ padding: "8px 14px", textAlign: "right", fontWeight: 800, color: "#FFA300", fontSize: 14, background: "#fff8f0", borderBottom: ultimo ? "2px solid #ddd" : "none" }}>{comp}</td>
                         </tr>
                       );
