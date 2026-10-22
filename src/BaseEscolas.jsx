@@ -702,6 +702,10 @@ function HistoricoTab({ escola, supabaseClient, autor, onSave }) {
   const [rmMidia, setRmMidia]       = useState([]);     // posições dos anexos a remover
   const [rmDocs, setRmDocs]         = useState([]);
   const [salvandoEdit, setSalvandoEdit] = useState(false);
+  const [novasMidias, setNovasMidias] = useState([]);   // anexos novos na edição: [{file, preview, tipo}]
+  const [novosDocs, setNovosDocs]     = useState([]);   // [{file}]
+  const midiaEditRef = useRef();
+  const docEditRef   = useRef();
   const chaveDe = (p) => p.id || `${p.criado_em || p.data || ""}|${(p.texto || "").slice(0, 30)}`;
 
   const postsBrutos = [...(escola.observacoes || [])].sort((a, b) => {
@@ -766,18 +770,30 @@ function HistoricoTab({ escola, supabaseClient, autor, onSave }) {
   }
 
   function iniciarEdicao(post) {
-    setEditKey(chaveDe(post)); setTextoEdit(post.texto || ""); setRmMidia([]); setRmDocs([]);
+    setEditKey(chaveDe(post)); setTextoEdit(post.texto || ""); setRmMidia([]); setRmDocs([]); setNovasMidias([]); setNovosDocs([]);
   }
 
   async function salvarEdicao(post) {
     const key = chaveDe(post);
     const original = (escola.observacoes || []).find(p => chaveDe(p) === key);
     if (!original) { alert("Publicação não encontrada. Atualize a página."); return; }
-    const midiaFica = (original.midia || []).filter((_, j) => !rmMidia.includes(j));
-    const docsFica  = (original.documentos || []).filter((_, j) => !rmDocs.includes(j));
-    if (!textoEdit.trim() && midiaFica.length === 0 && docsFica.length === 0) { alert("A publicação não pode ficar vazia."); return; }
+    const midiaMantida = (original.midia || []).filter((_, j) => !rmMidia.includes(j));
+    const docsMantidos = (original.documentos || []).filter((_, j) => !rmDocs.includes(j));
+    if (!textoEdit.trim() && midiaMantida.length + novasMidias.length === 0 && docsMantidos.length + novosDocs.length === 0) { alert("A publicação não pode ficar vazia."); return; }
     setSalvandoEdit(true);
     try {
+      const midiaNova = [];
+      for (const m of novasMidias) {
+        const url = await uploadFile(m.file, "midia");
+        midiaNova.push({ nome: m.file.name, url, tipo: m.tipo });
+      }
+      const docsNovos = [];
+      for (const d of novosDocs) {
+        const url = await uploadFile(d.file, "docs");
+        docsNovos.push({ nome: d.file.name, url, tipo: d.file.name.split(".").pop().toLowerCase() });
+      }
+      const midiaFica = [...midiaMantida, ...midiaNova];
+      const docsFica  = [...docsMantidos, ...docsNovos];
       const novas = (escola.observacoes || []).map(p => chaveDe(p) !== key ? p : {
         ...p, texto: textoEdit.trim(), midia: midiaFica, documentos: docsFica,
         editado_em: new Date().toISOString(), editado_por: autor || "—",
@@ -945,6 +961,38 @@ function HistoricoTab({ escola, supabaseClient, autor, onSave }) {
                       </button>;
                     })}
                   </div>
+                </div>
+              )}
+              {/* Adicionar anexos novos */}
+              <input ref={midiaEditRef} type="file" accept="image/*,video/*" multiple style={{ display: "none" }}
+                onChange={e => { Array.from(e.target.files).forEach(file => setNovasMidias(m => [...m, { file, preview: URL.createObjectURL(file), tipo: file.type.startsWith("video") ? "video" : "image" }])); e.target.value = ""; }} />
+              <input ref={docEditRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" multiple style={{ display: "none" }}
+                onChange={e => { setNovosDocs(d => [...d, ...Array.from(e.target.files).map(f => ({ file: f }))]); e.target.value = ""; }} />
+              <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+                <button onClick={() => midiaEditRef.current.click()}
+                  style={{ background: "#F1F2F2", border: "none", borderRadius: 6, padding: "8px 14px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>📷 Adicionar foto / vídeo</button>
+                <button onClick={() => docEditRef.current.click()}
+                  style={{ background: "#F1F2F2", border: "none", borderRadius: 6, padding: "8px 14px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>📎 Adicionar documento</button>
+              </div>
+              {(novasMidias.length > 0 || novosDocs.length > 0) && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+                  {novasMidias.map((m, i) => (
+                    <div key={"nm" + i} style={{ position: "relative" }}>
+                      {m.tipo === "image"
+                        ? <img src={m.preview} alt="" style={{ width: 70, height: 70, objectFit: "cover", borderRadius: 6 }} />
+                        : <video src={m.preview} style={{ width: 100, height: 70, objectFit: "cover", borderRadius: 6 }} />}
+                      <button onClick={() => setNovasMidias(mm => mm.filter((_, j) => j !== i))}
+                        style={{ position: "absolute", top: -6, right: -6, background: "#D81E27", color: "#fff", border: "none", borderRadius: "50%", width: 18, height: 18, fontSize: 10, cursor: "pointer", padding: 0 }}>✕</button>
+                    </div>
+                  ))}
+                  {novosDocs.map((d, i) => (
+                    <div key={"nd" + i} style={{ display: "flex", alignItems: "center", gap: 6, background: "#E8F8E3", borderRadius: 4, padding: "5px 10px", fontSize: 12, fontFamily: font }}>
+                      <span>{iconeDoc(d.file.name.split(".").pop().toLowerCase())}</span>
+                      <span style={{ maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.file.name}</span>
+                      <button onClick={() => setNovosDocs(dd => dd.filter((_, j) => j !== i))}
+                        style={{ background: "none", border: "none", color: "#D81E27", cursor: "pointer", padding: 0, fontSize: 14, lineHeight: 1 }}>✕</button>
+                    </div>
+                  ))}
                 </div>
               )}
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
