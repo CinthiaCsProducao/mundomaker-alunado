@@ -1023,8 +1023,13 @@ function InspiramakerDashboard({ onVoltar, onGerarRomaneio }) {
           const turmas = cl.filter(t => t.grade_class_id === s.id).sort((a, b) => (a.turma || "").localeCompare(b.turma || ""));
           series.push({ gcId: s.id, serie: s.serie, turmas });
           // Introdutório da série (Base de Escolas): mesma quantidade de alunos, linha própria
-          const pe = intros.find(x => chaveSerieSimples(x.serie) === chaveSerieSimples(s.serie));
-          if (pe) series.push({ gcId: `intro-${s.id}`, serie: s.serie, turmas, introNome: pe.intro });
+          // Mais de um introdutório na mesma série: separe por ponto e vírgula (ex.: "Cola quente; Circuito")
+          const nomesIntro = intros
+            .filter(x => chaveSerieSimples(x.serie) === chaveSerieSimples(s.serie))
+            .flatMap(x => String(x.intro).split(";"))
+            .map(n => n.trim())
+            .filter(Boolean);
+          nomesIntro.forEach((nome, k) => series.push({ gcId: `intro-${s.id}-${k}`, serie: s.serie, turmas, introNome: nome }));
         });
         return { id: escola.id, nome: escola.nome, idioma: escola.idioma_material || "Portugues", numSalas: escola.num_salas_maker || 0, series };
       // Só exibe escolas que têm pelo menos 1 aluno no ciclo atual
