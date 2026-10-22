@@ -1911,6 +1911,183 @@ function AniversariantesMes({ escolas, onAbrir, onFechar }) {
   );
 }
 
+// ── Relatório de projetos por escola ────────────────────────────
+function ordemSerieRel(t) {
+  const x = String(t || "").toLowerCase();
+  if (/infantil|^\s*ei\b|educa/.test(x)) return 0;
+  const n = parseInt((x.match(/\d/) || ["0"])[0], 10);
+  if (/m[eé]dio|\bem\b/.test(x)) return 20 + n;
+  return /\d/.test(x) ? n : 99;
+}
+const escHtmlRel = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+function RelatorioProjetos({ escolas, onAbrir, onFechar }) {
+  const [projetos, setProjetos] = useState(null);
+  const [incluirInativas, setIncluirInativas] = useState(false);
+  const [fTipoRel, setFTipoRel] = useState("");
+  const [buscaRel, setBuscaRel] = useState("");
+  const [exportando, setExportando] = useState(false);
+
+  useEffect(() => {
+    supabase.from("projetos_escola").select("escola_id, serie, intro, envio_1, envio_2, envio_3").then(({ data }) => setProjetos(data || []));
+  }, []);
+
+  const lista = escolas
+    .filter(e => incluirInativas || e.status === "Ativo")
+    .filter(e => !fTipoRel || e.tipo === fTipoRel)
+    .filter(e => !buscaRel || (e.nome || "").toLowerCase().includes(buscaRel.toLowerCase()))
+    .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"))
+    .map(e => ({
+      e,
+      linhas: (projetos || []).filter(p => p.escola_id === e.id)
+        .sort((a, b) => ordemSerieRel(a.serie) - ordemSerieRel(b.serie) || String(a.serie).localeCompare(String(b.serie), "pt-BR", { numeric: true })),
+    }));
+
+  const comProj = lista.filter(x => x.linhas.length > 0);
+  const semProj = lista.filter(x => x.linhas.length === 0);
+  const totalLinhas = comProj.reduce((n, x) => n + x.linhas.length, 0);
+  const val = (v) => (v && String(v).trim()) || "";
+
+  async function exportarExcel() {
+    setExportando(true);
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const { saveAs } = await import("file-saver");
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("Projetos por escola");
+      ws.columns = [
+        { header: "Escola", width: 34 }, { header: "Status", width: 10 }, { header: "Tipo", width: 26 }, { header: "Idioma", width: 12 },
+        { header: "Série", width: 12 }, { header: "Introdutório", width: 28 }, { header: "1º Envio", width: 28 }, { header: "2º Envio", width: 28 }, { header: "3º Envio", width: 28 },
+      ];
+      const cab = ws.getRow(1);
+      cab.eachCell(c => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF231F20" } }; c.alignment = { vertical: "middle" }; });
+      lista.forEach(({ e, linhas }) => {
+        if (linhas.length === 0) {
+          const r = ws.addRow([e.nome, e.status, e.tipo, e.idioma, "—", "Sem projetos cadastrados", "", "", ""]);
+          r.getCell(6).font = { italic: true, color: { argb: "FF888888" } };
+          return;
+        }
+        linhas.forEach(p => ws.addRow([e.nome, e.status, e.tipo, e.idioma, p.serie, val(p.intro), val(p.envio_1), val(p.envio_2), val(p.envio_3)]));
+      });
+      ws.views = [{ state: "frozen", ySplit: 1 }];
+      ws.autoFilter = { from: "A1", to: "I1" };
+      const buf = await wb.xlsx.writeBuffer();
+      saveAs(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `Projetos_por_escola_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (err) {
+      alert("Erro ao gerar o Excel: " + (err.message || err));
+    }
+    setExportando(false);
+  }
+
+  function exportarPDF() {
+    const win = window.open("", "_blank");
+    if (!win) { alert("Permita pop-ups para gerar o PDF."); return; }
+    const linhasHtml = lista.map(({ e, linhas }) => {
+      const cab = `<tr><td colspan="5" style="background:#231F20;color:#fff;font-weight:700;padding:7px 10px;">${escHtmlRel(e.nome)} <span style="font-weight:400;color:#C7C8CA;">· ${escHtmlRel([e.tipo, e.idioma, e.status === "Inativo" ? "Inativa" : ""].filter(Boolean).join(" · "))}</span></td></tr>`;
+      if (linhas.length === 0) return cab + `<tr><td colspan="5" style="padding:6px 10px;color:#888;font-style:italic;">Sem projetos cadastrados</td></tr>`;
+      return cab + linhas.map((p, i) => `<tr style="background:${i % 2 ? "#f9f9f9" : "#fff"}">
+        <td style="padding:5px 10px;font-weight:700;">${escHtmlRel(p.serie)}</td>
+        <td style="padding:5px 10px;">${escHtmlRel(val(p.intro) || "—")}</td>
+        <td style="padding:5px 10px;">${escHtmlRel(val(p.envio_1) || "—")}</td>
+        <td style="padding:5px 10px;">${escHtmlRel(val(p.envio_2) || "—")}</td>
+        <td style="padding:5px 10px;">${escHtmlRel(val(p.envio_3) || "—")}</td></tr>`).join("");
+    }).join("");
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Projetos por escola</title>
+      <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:20px}
+      h1{font-size:18px;margin-bottom:4px}.sub{color:#666;margin-bottom:14px}table{width:100%;border-collapse:collapse;margin-bottom:0}
+      th{background:#39DF18;text-align:left;padding:6px 10px;font-size:10px;text-transform:uppercase}td{border:1px solid #e5e5e5;vertical-align:top}
+      .btn{background:#39DF18;border:none;padding:9px 20px;font-weight:700;cursor:pointer;border-radius:4px;margin-bottom:14px}
+      @media print{.btn{display:none}body{padding:0}tr{page-break-inside:avoid}}</style></head><body>
+      <button class="btn" onclick="window.print()">Imprimir / Salvar como PDF</button>
+      <h1>Mundo Maker — Projetos cadastrados por escola</h1>
+      <div class="sub">${escHtmlRel(lista.length)} escolas · ${escHtmlRel(totalLinhas)} séries com projetos · gerado em ${escHtmlRel(new Date().toLocaleDateString("pt-BR"))}</div>
+      <table><thead><tr><th style="width:12%">Série</th><th>Introdutório</th><th>1º Envio</th><th>2º Envio</th><th>3º Envio</th></tr></thead><tbody>${linhasHtml}</tbody></table>
+      </body></html>`);
+    win.document.close();
+  }
+
+  const card = (valor, rotulo, cor) => (
+    <div style={{ background:"#fff",borderRadius:6,padding:"16px 20px",borderTop:`4px solid ${cor}` }}>
+      <div style={{ fontSize:30,fontWeight:800,fontFamily:font,lineHeight:1 }}>{valor}</div>
+      <div style={{ fontSize:11,fontWeight:700,fontFamily:font,letterSpacing:".05em",textTransform:"uppercase",color:"#6D6E71",marginTop:4 }}>{rotulo}</div>
+    </div>
+  );
+  const th = { padding:"8px 12px",textAlign:"left",fontSize:10,fontWeight:700,fontFamily:font,letterSpacing:".05em",textTransform:"uppercase",color:"#6D6E71",background:"#F1F2F2" };
+  const td = { padding:"8px 12px",fontSize:13,fontFamily:fontB,borderTop:"1px solid #F1F2F2",verticalAlign:"top" };
+
+  return (
+    <div style={{ maxWidth:1400,margin:"0 auto",padding:"0 clamp(16px,4vw,40px) 40px" }}>
+      <div style={{ display:"flex",gap:12,alignItems:"center",flexWrap:"wrap",marginBottom:16 }}>
+        <button onClick={onFechar}
+          style={{ background:"none",border:"2px solid #DCDDDE",borderRadius:6,padding:"8px 14px",fontSize:13,fontWeight:700,fontFamily:font,cursor:"pointer" }}>
+          ← Voltar à lista
+        </button>
+        <h2 style={{ margin:0,fontSize:22,fontWeight:800,fontFamily:font }}>Projetos por escola</h2>
+        <input value={buscaRel} onChange={e=>setBuscaRel(e.target.value)} placeholder="Buscar escola..."
+          style={{ background:"#fff",border:"2px solid #DCDDDE",borderRadius:6,padding:"8px 12px",fontFamily:fontB,fontSize:14 }} />
+        <select value={fTipoRel} onChange={e=>setFTipoRel(e.target.value)}
+          style={{ background:"#fff",border:"2px solid #DCDDDE",borderRadius:6,padding:"9px 10px",fontFamily:fontB,fontSize:14,cursor:"pointer" }}>
+          <option value="">Todos os tipos</option>
+          {TIPO_OPTS.map(o => <option key={o}>{o}</option>)}
+        </select>
+        <label style={{ display:"flex",alignItems:"center",gap:6,fontSize:13,fontFamily:fontB,cursor:"pointer" }}>
+          <input type="checkbox" checked={incluirInativas} onChange={e=>setIncluirInativas(e.target.checked)} />
+          Incluir escolas inativas
+        </label>
+        <div style={{ marginLeft:"auto",display:"flex",gap:8 }}>
+          <button onClick={exportarPDF} disabled={!projetos}
+            style={{ background:"#e53935",color:"#fff",border:"none",borderRadius:6,padding:"9px 16px",fontSize:13,fontWeight:800,fontFamily:font,cursor:"pointer" }}>↓ PDF</button>
+          <button onClick={exportarExcel} disabled={!projetos || exportando}
+            style={{ background:VERDE,color:PRETO,border:"none",borderRadius:6,padding:"9px 16px",fontSize:13,fontWeight:800,fontFamily:font,cursor:"pointer",opacity:exportando?.6:1 }}>
+            {exportando ? "Gerando..." : "↓ Excel"}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12,marginBottom:20 }}>
+        {card(lista.length, "Escolas no relatório", PRETO)}
+        {card(comProj.length, "Com projetos cadastrados", VERDE)}
+        {card(semProj.length, "Sem projetos cadastrados", "#FFA300")}
+        {card(totalLinhas, "Séries com projetos", "#DCDDDE")}
+      </div>
+
+      {!projetos ? (
+        <div style={{ background:"#fff",borderRadius:6,padding:40,textAlign:"center",color:"#888" }}>Carregando...</div>
+      ) : lista.length === 0 ? (
+        <div style={{ background:"#fff",borderRadius:6,padding:40,textAlign:"center",color:"#888" }}>Nenhuma escola encontrada.</div>
+      ) : lista.map(({ e, linhas }) => (
+        <div key={e.id} style={{ background:"#fff",borderRadius:6,overflow:"hidden",marginBottom:12 }}>
+          <div onClick={()=>onAbrir(e)} title="Abrir a escola"
+            style={{ background:"#231F20",color:"#fff",padding:"10px 18px",fontFamily:font,fontWeight:800,fontSize:14,cursor:"pointer",display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap" }}>
+            <span>{e.nome}</span>
+            <span style={{ fontSize:11,fontWeight:600,color:"#C7C8CA" }}>{[e.tipo, e.idioma, e.status === "Inativo" ? "Inativa" : null].filter(Boolean).join(" · ")}</span>
+          </div>
+          {linhas.length === 0 ? (
+            <div style={{ padding:"10px 18px",color:"#aaa",fontStyle:"italic",fontSize:13 }}>Sem projetos cadastrados</div>
+          ) : (
+            <div style={{ overflowX:"auto" }}>
+              <table style={{ width:"100%",borderCollapse:"collapse" }}>
+                <thead><tr>{["Série","Introdutório","1º Envio","2º Envio","3º Envio"].map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {linhas.map((p, i) => (
+                    <tr key={i}>
+                      <td style={{ ...td,fontWeight:700 }}>{p.serie}</td>
+                      <td style={td}>{val(p.intro) || <span style={{ color:"#ccc" }}>—</span>}</td>
+                      <td style={td}>{val(p.envio_1) || <span style={{ color:"#ccc" }}>—</span>}</td>
+                      <td style={td}>{val(p.envio_2) || <span style={{ color:"#ccc" }}>—</span>}</td>
+                      <td style={td}>{val(p.envio_3) || <span style={{ color:"#ccc" }}>—</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function BaseEscolas({ onVoltar, equipeLogada }) {
   const [escolas, setEscolas]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -1926,6 +2103,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
   const [novaModal, setNovaModal] = useState(false);
   const [verContratos, setVerContratos] = useState(false);
   const [verAniv, setVerAniv] = useState(false);
+  const [verProj, setVerProj] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -2170,13 +2348,17 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
             {opts.map(o=><option key={o}>{o}</option>)}
           </select>
         ))}
-        <button onClick={()=>{ setVerContratos(v=>!v); setVerAniv(false); }}
+        <button onClick={()=>{ setVerContratos(v=>!v); setVerAniv(false); setVerProj(false); }}
           style={{ background:verContratos?PRETO:"#fff",color:verContratos?"#fff":PRETO,border:"2px solid "+(verContratos?PRETO:"#DCDDDE"),borderRadius:6,padding:"9px 16px",fontSize:14,fontWeight:800,fontFamily:font,cursor:"pointer" }}>
           📅 Contratos a vencer
         </button>
-        <button onClick={()=>{ setVerAniv(v=>!v); setVerContratos(false); }}
+        <button onClick={()=>{ setVerAniv(v=>!v); setVerContratos(false); setVerProj(false); }}
           style={{ background:verAniv?PRETO:"#fff",color:verAniv?"#fff":PRETO,border:"2px solid "+(verAniv?PRETO:"#DCDDDE"),borderRadius:6,padding:"9px 16px",fontSize:14,fontWeight:800,fontFamily:font,cursor:"pointer" }}>
           🎂 Aniversariantes do mês
+        </button>
+        <button onClick={()=>{ setVerProj(v=>!v); setVerContratos(false); setVerAniv(false); }}
+          style={{ background:verProj?PRETO:"#fff",color:verProj?"#fff":PRETO,border:"2px solid "+(verProj?PRETO:"#DCDDDE"),borderRadius:6,padding:"9px 16px",fontSize:14,fontWeight:800,fontFamily:font,cursor:"pointer" }}>
+          📋 Projetos por escola
         </button>
         <button onClick={()=>setNovaModal(true)}
           style={{ background:VERDE,color:PRETO,border:"none",borderRadius:6,padding:"10px 16px",fontSize:14,fontWeight:800,fontFamily:font,cursor:"pointer" }}>
@@ -2200,8 +2382,16 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
         />
       )}
 
+      {verProj && (
+        <RelatorioProjetos
+          escolas={escolas}
+          onFechar={()=>setVerProj(false)}
+          onAbrir={(e)=>{ setSel(e); setTab("proj"); setVerProj(false); }}
+        />
+      )}
+
       {/* Layout principal */}
-      {!verContratos && !verAniv && (
+      {!verContratos && !verAniv && !verProj && (
       <div className={"be-layout"+(sel?" tem-sel":"")} style={{ maxWidth:1400,margin:"0 auto",padding:"0 clamp(16px,4vw,40px) 40px",display:"grid",gridTemplateColumns:sel?"minmax(300px,380px) 1fr":"1fr",gap:20,alignItems:"start" }}>
         {/* Lista */}
         <div className="be-lista" style={{ background:"#fff",borderRadius:6,overflow:"hidden",position:"sticky",top:0 }}>
