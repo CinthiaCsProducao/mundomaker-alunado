@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "./supabaseClient";
 import { mapTipo } from "./programaTipo";
-import { useAssinados, auditar } from "./storageSeguro";
+import { useAssinados, auditar, caminhoDoArquivo } from "./storageSeguro";
 
 const font = "'Figtree','Circular Std','Segoe UI',system-ui,sans-serif";
 const fontB = "'Barlow','DIN Round Pro','Segoe UI',system-ui,sans-serif";
@@ -697,6 +697,12 @@ function HistoricoTab({ escola, supabaseClient, autor, onSave }) {
   const [expandImg, setExpandImg] = useState(null); // { url, nome }
   const midiaRef = useRef();
   const docRef   = useRef();
+  const [editKey, setEditKey]       = useState(null);   // publicação em edição
+  const [textoEdit, setTextoEdit]   = useState("");
+  const [rmMidia, setRmMidia]       = useState([]);     // posições dos anexos a remover
+  const [rmDocs, setRmDocs]         = useState([]);
+  const [salvandoEdit, setSalvandoEdit] = useState(false);
+  const chaveDe = (p) => p.id || `${p.criado_em || p.data || ""}|${(p.texto || "").slice(0, 30)}`;
 
   const postsBrutos = [...(escola.observacoes || [])].sort((a, b) => {
     const da = a.criado_em || a.data || "";
@@ -757,6 +763,38 @@ function HistoricoTab({ escola, supabaseClient, autor, onSave }) {
       alert("Erro ao publicar: " + (err.message || "Tente novamente."));
     }
     setSalvando(false);
+  }
+
+  function iniciarEdicao(post) {
+    setEditKey(chaveDe(post)); setTextoEdit(post.texto || ""); setRmMidia([]); setRmDocs([]);
+  }
+
+  async function salvarEdicao(post) {
+    const key = chaveDe(post);
+    const original = (escola.observacoes || []).find(p => chaveDe(p) === key);
+    if (!original) { alert("Publicação não encontrada. Atualize a página."); return; }
+    const midiaFica = (original.midia || []).filter((_, j) => !rmMidia.includes(j));
+    const docsFica  = (original.documentos || []).filter((_, j) => !rmDocs.includes(j));
+    if (!textoEdit.trim() && midiaFica.length === 0 && docsFica.length === 0) { alert("A publicação não pode ficar vazia."); return; }
+    setSalvandoEdit(true);
+    try {
+      const novas = (escola.observacoes || []).map(p => chaveDe(p) !== key ? p : {
+        ...p, texto: textoEdit.trim(), midia: midiaFica, documentos: docsFica,
+        editado_em: new Date().toISOString(), editado_por: autor || "—",
+      });
+      await onSave(escola.id, { observacoes: novas });
+      // apaga do armazenamento os anexos removidos (melhor esforço)
+      const caminhos = [
+        ...(original.midia || []).filter((_, j) => rmMidia.includes(j)),
+        ...(original.documentos || []).filter((_, j) => rmDocs.includes(j)),
+      ].map(a => caminhoDoArquivo("historico-escola", a.url)).filter(Boolean);
+      if (caminhos.length > 0) await supabaseClient.storage.from("historico-escola").remove(caminhos);
+      auditar("editar_historico", "base_escolas", escola.id);
+      setEditKey(null);
+    } catch (err) {
+      alert("Erro ao salvar: " + (err.message || "Tente novamente."));
+    }
+    setSalvandoEdit(false);
   }
 
   function iconeDoc(tipo) {
@@ -869,12 +907,59 @@ function HistoricoTab({ escola, supabaseClient, autor, onSave }) {
             </div>
             <div>
               <div style={{ fontWeight: 800, fontSize: 13, fontFamily: font }}>{post.autor || "—"}</div>
-              <div style={{ fontSize: 11, color: "#888", fontFamily: font }}>{fmtData(post.criado_em || post.data)}</div>
+              <div style={{ fontSize: 11, color: "#888", fontFamily: font }}>
+                {fmtData(post.criado_em || post.data)}
+                {post.editado_em && <span> · editado por {post.editado_por || "—"} em {fmtData(post.editado_em)}</span>}
+              </div>
             </div>
+            <div style={{ flex: 1 }} />
+            {editKey !== chaveDe(post) && (
+              <button onClick={() => iniciarEdicao(post)} title="Editar publicação"
+                style={{ background: "#F1F2F2", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer", color: PRETO_LOCAL }}>
+                ✎ Editar
+              </button>
+            )}
           </div>
 
+          {/* Edição */}
+          {editKey === chaveDe(post) && (
+            <div style={{ padding: "4px 16px 14px" }}>
+              <textarea value={textoEdit} onChange={e => setTextoEdit(e.target.value)} rows={6}
+                style={{ width: "100%", border: "1.5px solid #DCDDDE", borderRadius: 6, padding: "10px 12px", fontSize: 14, fontFamily: fontB, resize: "vertical", boxSizing: "border-box" }} />
+              {((post.midia || []).length > 0 || (post.documentos || []).length > 0) && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, fontFamily: font, textTransform: "uppercase", letterSpacing: ".05em", color: "#888", marginBottom: 6 }}>Anexos (clique para remover)</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {(post.midia || []).map((m, j) => {
+                      const rm = rmMidia.includes(j);
+                      return <button key={"m" + j} onClick={() => setRmMidia(r => rm ? r.filter(x => x !== j) : [...r, j])}
+                        style={{ border: "1px solid #DCDDDE", background: rm ? "#FDECEC" : "#F1F2F2", color: rm ? "#D81E27" : "#333", textDecoration: rm ? "line-through" : "none", borderRadius: 4, padding: "5px 10px", fontSize: 12, fontFamily: font, cursor: "pointer" }}>
+                        {m.tipo === "video" ? "🎬" : "🖼"} {m.nome}{rm ? " (será removido)" : ""}
+                      </button>;
+                    })}
+                    {(post.documentos || []).map((d, j) => {
+                      const rm = rmDocs.includes(j);
+                      return <button key={"d" + j} onClick={() => setRmDocs(r => rm ? r.filter(x => x !== j) : [...r, j])}
+                        style={{ border: "1px solid #DCDDDE", background: rm ? "#FDECEC" : "#F1F2F2", color: rm ? "#D81E27" : "#333", textDecoration: rm ? "line-through" : "none", borderRadius: 4, padding: "5px 10px", fontSize: 12, fontFamily: font, cursor: "pointer" }}>
+                        {iconeDoc(d.tipo)} {d.nome}{rm ? " (será removido)" : ""}
+                      </button>;
+                    })}
+                  </div>
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+                <button onClick={() => setEditKey(null)}
+                  style={{ background: "none", border: "1.5px solid #DCDDDE", borderRadius: 6, padding: "8px 14px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>Cancelar</button>
+                <button onClick={() => salvarEdicao(post)} disabled={salvandoEdit}
+                  style={{ background: VERDE_LOCAL, color: PRETO_LOCAL, border: "none", borderRadius: 6, padding: "8px 20px", fontSize: 12, fontWeight: 800, fontFamily: font, cursor: "pointer", opacity: salvandoEdit ? 0.6 : 1 }}>
+                  {salvandoEdit ? "Salvando..." : "Salvar alterações"}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Texto */}
-          {post.texto && (
+          {editKey !== chaveDe(post) && post.texto && (
             <div style={{ padding: "4px 16px 12px", fontSize: 14, fontFamily: fontB, color: PRETO_LOCAL, whiteSpace: "pre-wrap", lineHeight: 1.55 }}>
               {post.texto}
             </div>
