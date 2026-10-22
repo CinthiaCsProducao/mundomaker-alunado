@@ -725,7 +725,8 @@ function HistoricoTab({ escola, supabaseClient, autor, onSave }) {
   }
 
   function addDocs(e) {
-    setDocs(d => [...d, ...Array.from(e.target.files).map(f => ({ file: f }))]);
+    const novos = Array.from(e.target.files).map(f => ({ file: f }));
+    setDocs(d => [...d, ...novos]);
     e.target.value = "";
   }
 
@@ -967,7 +968,7 @@ function HistoricoTab({ escola, supabaseClient, autor, onSave }) {
               <input ref={midiaEditRef} type="file" accept="image/*,video/*" multiple style={{ display: "none" }}
                 onChange={e => { Array.from(e.target.files).forEach(file => setNovasMidias(m => [...m, { file, preview: URL.createObjectURL(file), tipo: file.type.startsWith("video") ? "video" : "image" }])); e.target.value = ""; }} />
               <input ref={docEditRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" multiple style={{ display: "none" }}
-                onChange={e => { setNovosDocs(d => [...d, ...Array.from(e.target.files).map(f => ({ file: f }))]); e.target.value = ""; }} />
+                onChange={e => { const novos = Array.from(e.target.files).map(f => ({ file: f })); setNovosDocs(d => [...d, ...novos]); e.target.value = ""; }} />
               <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
                 <button onClick={() => midiaEditRef.current.click()}
                   style={{ background: "#F1F2F2", border: "none", borderRadius: 6, padding: "8px 14px", fontSize: 12, fontWeight: 700, fontFamily: font, cursor: "pointer" }}>📷 Adicionar foto / vídeo</button>
@@ -1123,7 +1124,8 @@ function RubricasTab({ escola, supabaseClient, autor, onSave }) {
   }
 
   function addDocs(e) {
-    setDocs(d => [...d, ...Array.from(e.target.files).map(f => ({ file: f }))]);
+    const novos = Array.from(e.target.files).map(f => ({ file: f }));
+    setDocs(d => [...d, ...novos]);
     e.target.value = "";
   }
 
