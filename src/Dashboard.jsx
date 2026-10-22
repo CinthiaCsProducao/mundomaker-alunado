@@ -2155,8 +2155,8 @@ export default function Dashboard() {
       <div style={{ background: "#fff", borderRadius: 8, padding: "48px 56px", maxWidth: 400, width: "100%", margin: 20, boxShadow: "0 4px 24px rgba(0,0,0,0.12)" }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <LogoMM size={60} cor="#111" />
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#111", marginTop: 8 }}>Facilite</div>
-          <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>Mundo Maker</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#111", marginTop: 8 }}>Mundo Maker</div>
+          <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>Facilite</div>
         </div>
 
         {/* ── Login normal ── */}
