@@ -2088,7 +2088,7 @@ function RelatorioProjetos({ escolas, onAbrir, onFechar }) {
   );
 }
 
-export default function BaseEscolas({ onVoltar, equipeLogada }) {
+export default function BaseEscolas({ onVoltar, equipeLogada, limitado = false }) {
   const [escolas, setEscolas]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [busca, setBusca]         = useState("");
@@ -2117,8 +2117,13 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
   async function save(id, patch) {
     const escola = escolas.find(e=>e.id===id);
     if (!escola) return;
+    if (limitado && !Object.keys(patch).every(k => k === "observacoes" || k === "reunioes")) {
+      alert("Seu acesso permite editar apenas Histórico e Reuniões.");
+      return;
+    }
     const newData = { ...escola, ...patch, atualizadoEm: new Date().toISOString() };
-    await supabase.from("base_escolas").upsert([{ id, data: newData }]);
+    const { error: errSave } = await supabase.from("base_escolas").update({ data: newData }).eq("id", id);
+    if (errSave) { alert("Não foi possível salvar: " + errSave.message); return; }
     // Mudou o Tipo da escola: atualiza o programa dela nas telas Escolas e Inspiramaker
     if (patch.tipo !== undefined && patch.tipo !== escola.tipo) {
       await supabase.from("schools").update({ programa: mapTipo(patch.tipo) || null }).eq("escola_base_id", id);
@@ -2360,10 +2365,12 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
           style={{ background:verProj?PRETO:"#fff",color:verProj?"#fff":PRETO,border:"2px solid "+(verProj?PRETO:"#DCDDDE"),borderRadius:6,padding:"9px 16px",fontSize:14,fontWeight:800,fontFamily:font,cursor:"pointer" }}>
           📋 Projetos por escola
         </button>
+        {!limitado && (
         <button onClick={()=>setNovaModal(true)}
           style={{ background:VERDE,color:PRETO,border:"none",borderRadius:6,padding:"10px 16px",fontSize:14,fontWeight:800,fontFamily:font,cursor:"pointer" }}>
           + Nova Escola
         </button>
+        )}
       </div>
 
       {verContratos && (
@@ -2442,10 +2449,12 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
                 </div>
               </div>
               <div style={{ display:"flex",gap:8,alignItems:"center" }}>
+                {!limitado && (
                 <button onClick={()=>setConfirm({msg:`Excluir "${sel.nome}"? Esta ação não pode ser desfeita.`,onConfirm:()=>excluir(sel)})}
                   style={{ background:"transparent",color:"#D81E27",border:"2px solid #D81E27",borderRadius:6,padding:"6px 14px",fontSize:12,fontWeight:700,fontFamily:font,cursor:"pointer" }}>
                   Excluir
                 </button>
+                )}
                 <button onClick={()=>setSel(null)} style={{ background:"none",border:"none",fontSize:22,cursor:"pointer",color:"#6D6E71" }}>×</button>
               </div>
             </div>
@@ -2463,6 +2472,12 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
 
             {/* Conteúdo da tab */}
             <div style={{ padding:"22px 26px 30px" }}>
+              {limitado && tab!=="obs" && tab!=="reunioes" && (
+                <div style={{ background:"#F1F2F2",border:"1px solid #DCDDDE",borderRadius:6,padding:"8px 12px",marginBottom:16,fontSize:13,fontFamily:fontB,color:"#6D6E71" }}>
+                  Somente leitura. Seu acesso permite editar apenas Histórico e Reuniões.
+                </div>
+              )}
+              <div style={limitado && tab!=="obs" && tab!=="reunioes" ? { pointerEvents:"none" } : undefined}>
               {tab==="cad" && renderCadastro(sel)}
               {tab==="alu" && <AlunadoTab
                 escola={sel}
@@ -2482,6 +2497,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada }) {
               {tab==="proj" && <ProjetosTab escola={sel} supabaseClient={supabase}/>}
               {tab==="rubrica" && <RubricasTab escola={sel} supabaseClient={supabase} autor={equipeLogada?.equipe || "—"} onSave={save} />}
               {tab==="reunioes" && <ReuniaoTab escola={sel} autor={equipeLogada?.equipe || "—"} onSave={save} />}
+              </div>
             </div>
           </div>
         )}

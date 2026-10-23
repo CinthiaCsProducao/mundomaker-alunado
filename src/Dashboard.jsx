@@ -2258,7 +2258,7 @@ export default function Dashboard() {
       { id: "histromaneios", label: "Hist. Romaneios", show: true },
     ] },
     { grupo: "Cadastros", itens: [
-      { id: "baseescolas", label: "Base Escolas", show: !!perm.baseEscolas },
+      { id: "baseescolas", label: "Base Escolas", show: !!perm.baseEscolas || !!perm.baseEscolasRelatos },
       { id: "pops", label: "POPs", show: true },
     ] },
     { grupo: "Cursos", itens: [
@@ -2354,7 +2354,7 @@ export default function Dashboard() {
       )}
 
       {view === "baseescolas" && (
-        <BaseEscolas onVoltar={() => setView("dashboard")} equipeLogada={equipeLogada} />
+        <BaseEscolas onVoltar={() => setView("dashboard")} equipeLogada={equipeLogada} limitado={!perm.baseEscolas && !isAdmin && !!perm.baseEscolasRelatos} />
       )}
 
       {view === "cortes" && (
