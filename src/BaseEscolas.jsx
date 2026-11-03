@@ -258,6 +258,7 @@ function AlunadoTab({ escola, supabaseClient, onEditContrato, onEditMatriz }) {
   const matriz = escola.seriesMatriz || {};
   const total = SERIES_KEYS.filter(k=>!["em1","em2","em3"].includes(k)).reduce((a,k)=>a+(series[k]||0),0);
   const totalComEM = SERIES_KEYS.reduce((a,k)=>a+(series[k]||0),0);
+  const totalEM = ["em1","em2","em3"].reduce((a,k)=>a+(series[k]||0),0);
   const diff = totalComEM - (Number(escola.contratoAlunado)||0);
   const seriesComDados = SERIES_KEYS.filter(k=>(series[k]||0)>0||(matriz[k]!=null&&matriz[k]!==""));
 
@@ -268,7 +269,7 @@ function AlunadoTab({ escola, supabaseClient, onEditContrato, onEditMatriz }) {
       <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:20 }}>
         {[
           {label:"EI ao 9º", value:total},
-          {label:"Com Ensino Médio", value:totalComEM},
+          {label:"Ensino Médio", value:totalEM},
           {label:"Contrato", value:escola.contratoAlunado||"—"},
           {label:"Diferença", value:diff>0?"+"+diff:diff, destaque:diff!==0},
         ].map(st=>(
