@@ -2089,7 +2089,7 @@ function RelatorioProjetos({ escolas, onAbrir, onFechar }) {
   );
 }
 
-export default function BaseEscolas({ onVoltar, equipeLogada, limitado = false }) {
+export default function BaseEscolas({ onVoltar, equipeLogada, limitado = false, podeExcluirForm = false }) {
   const [escolas, setEscolas]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [busca, setBusca]         = useState("");
@@ -2140,6 +2140,24 @@ export default function BaseEscolas({ onVoltar, equipeLogada, limitado = false }
     setEscolas(prev=>prev.filter(e=>e.id!==escola.id));
     if (sel?.id===escola.id) setSel(null);
     setConfirm(null);
+  }
+
+  // Apaga o formulário enviado pela escola e tudo que ele gerou (cadastro em Escolas, séries, turmas,
+  // histórico de envios e arquivos). A escola continua na Base Escolas. Só quem tem a permissão especial.
+  async function excluirFormulario(escola) {
+    const { data, error } = await supabase.rpc("excluir_formulario_escola", { p_base_id: String(escola.id) });
+    if (error || !data?.ok) {
+      alert("Não foi possível excluir: " + (error?.message || data?.motivo || "tente novamente."));
+      setConfirm(null);
+      return;
+    }
+    const remover = async (bucket, lista) => {
+      const caminhos = (lista || []).map(v => caminhoDoArquivo(bucket, v)).filter(Boolean);
+      if (caminhos.length) await supabase.storage.from(bucket).remove(caminhos);
+    };
+    try { await remover("signatures", data.assinaturas); await remover("calendars", data.calendarios); } catch (e) { /* melhor esforço */ }
+    setConfirm(null);
+    alert(`Formulário excluído: ${data.envios} envio(s), ${data.series} série(s), ${data.turmas} turma(s).`);
   }
 
   async function criarEscola(form) {
@@ -2450,6 +2468,12 @@ export default function BaseEscolas({ onVoltar, equipeLogada, limitado = false }
                 </div>
               </div>
               <div style={{ display:"flex",gap:8,alignItems:"center" }}>
+                {podeExcluirForm && (
+                <button onClick={()=>setConfirm({msg:`Excluir o FORMULÁRIO de "${sel.nome}" e tudo ligado a ele (envios, séries, turmas, cadastro em Escolas e arquivos)? A escola continua na Base Escolas. Esta ação não pode ser desfeita.`,okLabel:"Excluir formulário",onConfirm:()=>excluirFormulario(sel)})}
+                  style={{ background:"transparent",color:"#D81E27",border:"2px dashed #D81E27",borderRadius:6,padding:"6px 14px",fontSize:12,fontWeight:700,fontFamily:font,cursor:"pointer" }}>
+                  Excluir formulário
+                </button>
+                )}
                 {!limitado && (
                 <button onClick={()=>setConfirm({msg:`Excluir "${sel.nome}"? Esta ação não pode ser desfeita.`,onConfirm:()=>excluir(sel)})}
                   style={{ background:"transparent",color:"#D81E27",border:"2px solid #D81E27",borderRadius:6,padding:"6px 14px",fontSize:12,fontWeight:700,fontFamily:font,cursor:"pointer" }}>
@@ -2528,7 +2552,7 @@ export default function BaseEscolas({ onVoltar, equipeLogada, limitado = false }
 
       {/* Confirm */}
       {confirm && (
-        <Confirm msg={confirm.msg} onConfirm={confirm.onConfirm} onClose={()=>setConfirm(null)}/>
+        <Confirm msg={confirm.msg} onConfirm={confirm.onConfirm} onClose={()=>setConfirm(null)} {...(confirm.okLabel ? { okLabel: confirm.okLabel } : {})}/>
       )}
     </div>
   );

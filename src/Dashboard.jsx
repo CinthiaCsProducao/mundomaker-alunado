@@ -2354,7 +2354,7 @@ export default function Dashboard() {
       )}
 
       {view === "baseescolas" && (
-        <BaseEscolas onVoltar={() => setView("dashboard")} equipeLogada={equipeLogada} limitado={!perm.baseEscolas && !isAdmin && !!perm.baseEscolasRelatos} />
+        <BaseEscolas onVoltar={() => setView("dashboard")} equipeLogada={equipeLogada} limitado={!perm.baseEscolas && !isAdmin && !!perm.baseEscolasRelatos} podeExcluirForm={perm.excluirFormularios === true} />
       )}
 
       {view === "cortes" && (
